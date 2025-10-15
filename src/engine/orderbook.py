@@ -1,4 +1,4 @@
-from order import Order
+from src.core.order import Order
 
 class OrderBook:
     """
