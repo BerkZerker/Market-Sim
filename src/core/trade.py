@@ -1,6 +1,7 @@
-from dataclasses import dataclass, field
 import time
 import uuid
+from dataclasses import dataclass, field
+
 
 @dataclass
 class Trade:

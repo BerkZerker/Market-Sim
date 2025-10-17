@@ -1,6 +1,7 @@
-import uuid
 import time
+import uuid
 from dataclasses import dataclass, field
+
 
 @dataclass(order=True)
 class Order:
@@ -12,7 +13,7 @@ class Order:
 
     # Primary sorting key
     price: float = field(compare=True)
-    
+
     # Other fields
     quantity: int = field(compare=False)
     user_id: uuid.UUID = field(compare=False)
