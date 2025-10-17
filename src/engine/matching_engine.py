@@ -1,6 +1,6 @@
-from src.core.order import Order
-from src.core.trade import Trade
-from src.engine.orderbook import OrderBook
+from core.order import Order
+from core.trade import Trade
+from engine.orderbook import OrderBook
 
 
 class MatchingEngine:

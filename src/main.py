@@ -1,9 +1,12 @@
-from src.core.order import Order
-from src.core.user import User
-from src.engine.matching_engine import MatchingEngine
-from src.engine.orderbook import OrderBook
+from core.order import Order
+from core.user import User
+from engine.matching_engine import MatchingEngine
+from engine.orderbook import OrderBook
 
-if __name__ == "__main__":
+def main():
+    """
+    Runs the market simulation.
+    """
 
     # 1. Setup
     sim_stock_ticker = "SIM"
@@ -76,3 +79,6 @@ if __name__ == "__main__":
     print(user1)
     print(user2)
     print(user3)
+
+if __name__ == "__main__":
+    main()
