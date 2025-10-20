@@ -21,7 +21,7 @@ class Agent:
         side = random.choice(["buy", "sell"])
         
         # Generate a price with a small deviation from the last price
-        price_deviation = random.uniform(-0.05, 0.05) * last_price
+        price_deviation = random.uniform(-0.5, 0.5) * last_price
         price = round(last_price + price_deviation, 2)
         
         quantity = random.randint(1, 100)

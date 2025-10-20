@@ -21,7 +21,7 @@ def create_layout() -> Layout:
     """
     layout = Layout()
     layout.split_column(
-        Layout(name="header"),
+        Layout(name="header", ratio=2),
         Layout(ratio=1, name="main"),
     )
     layout["main"].split_row(
@@ -30,7 +30,6 @@ def create_layout() -> Layout:
     )
     layout["charts"].split_column(
         Layout(name="ticker_price", ratio=1),
-        Layout(name="bids_asks_chart", ratio=2),
         Layout(name="candlestick_chart", ratio=2),
     )
     return layout
@@ -49,86 +48,111 @@ def create_order_book_table(order_book: OrderBook) -> Table:
         table.add_row(bid_str, ask_str)
     return table
 
-def create_bids_asks_chart(order_book: OrderBook) -> Text:
+def create_bids_asks_chart(order_book: OrderBook, width: int = 80, height: int = 10) -> Text:
     """
-    Creates a U-shaped chart for the bid and ask prices.
+    Creates a horizontal bar chart for the bid and ask volumes.
     """
-    bids = sorted(order_book.bids, key=lambda x: x.price, reverse=True)
-    asks = sorted(order_book.asks, key=lambda x: x.price)
+    bids = order_book.bids
+    asks = order_book.asks
 
     if not bids and not asks:
         return Text("No data", justify="center")
 
+    all_prices = [o.price for o in bids] + [o.price for o in asks]
+    min_price = min(all_prices) if all_prices else 0
+    max_price = max(all_prices) if all_prices else 1
+
+    price_range = max_price - min_price
+    if price_range == 0:
+        price_range = 1
+
+    bid_bins = [0] * width
+    ask_bins = [0] * width
+
+    for bid in bids:
+        bin_index = int(((bid.price - min_price) / price_range) * (width - 1))
+        bid_bins[bin_index] += bid.quantity
+
+    for ask in asks:
+        bin_index = int(((ask.price - min_price) / price_range) * (width - 1))
+        ask_bins[bin_index] += ask.quantity
+    
     max_vol = 0
-    if bids:
-        max_vol = max(max_vol, max(bid.quantity for bid in bids))
-    if asks:
-        max_vol = max(max_vol, max(ask.quantity for ask in asks))
+    if bid_bins:
+        max_vol = max(max_vol, max(bid_bins))
+    if ask_bins:
+        max_vol = max(max_vol, max(ask_bins))
+
+    if max_vol == 0:
+        max_vol = 1
 
     chart = Text()
-    for i in range(10, -1, -1):
+    for y in range(height - 1, -1, -1):
         row = Text()
-        # Bids
-        bid_vol_str = ""
-        if bids and i < len(bids):
-            bid = bids[i]
-            bar_len = int((bid.quantity / max_vol) * 20) if max_vol > 0 else 0
-            bid_vol_str = "█" * bar_len
-            row.append(f"{bid_vol_str:>20} ", style="green")
-            row.append(f"{bid.price:.2f} |", style="white")
-        else:
-            row.append(" " * 21 + "|", style="white")
+        for x in range(width):
+            bid_vol = bid_bins[x]
+            ask_vol = ask_bins[x]
 
-        # Asks
-        if asks and i < len(asks):
-            ask = asks[i]
-            bar_len = int((ask.quantity / max_vol) * 20) if max_vol > 0 else 0
-            ask_vol_str = "█" * bar_len
-            row.append(f" {ask.price:.2f} ", style="white")
-            row.append(f"{ask_vol_str:<20}", style="red")
-        else:
-            row.append(" " * 22, style="white")
-        
+            bid_height = int((bid_vol / max_vol) * height) if max_vol > 0 else 0
+            ask_height = int((ask_vol / max_vol) * height) if max_vol > 0 else 0
+
+            if y < bid_height:
+                row.append("█", style="green")
+            elif y < ask_height:
+                row.append("█", style="red")
+            else:
+                row.append(" ")
         chart.append(row)
         chart.append("\n")
 
     return chart
 
-def create_candlestick_chart(prices: deque) -> Text:
+def create_candlesticks(prices: deque, bucket_size: int = 5) -> list:
+    candlesticks = []
+    if len(prices) < bucket_size:
+        return []
+
+    for i in range(0, len(prices) - len(prices) % bucket_size, bucket_size):
+        bucket = list(prices)[i:i+bucket_size]
+        open_price = bucket[0]
+        close_price = bucket[-1]
+        high_price = max(bucket)
+        low_price = min(bucket)
+        candlesticks.append((open_price, high_price, low_price, close_price))
+    return candlesticks
+
+def create_candlestick_chart(candlesticks: list, width: int = 50, height: int = 10) -> Text:
     """
     Creates a simple candlestick chart.
     """
-    if len(prices) < 2:
+    if not candlesticks:
         return Text("No data", justify="center")
 
-    max_price = max(prices)
-    min_price = min(prices)
+    all_prices = [p for cs in candlesticks for p in cs]
+    max_price = max(all_prices)
+    min_price = min(all_prices)
     price_range = max_price - min_price if max_price > min_price else 1
 
     chart = Text()
-    for i in range(0, len(prices) -1, 2):
-        open_price = prices[i]
-        close_price = prices[i+1]
+    for y in range(height - 1, -1, -1):
+        row = Text()
+        for i, (open_price, high_price, low_price, close_price) in enumerate(candlesticks):
+            if i >= width:
+                break
 
-        if close_price >= open_price:
-            color = "green"
-            body = "┃"
-        else:
-            color = "red"
-            body = "┃"
-        
-        high = max(open_price, close_price)
-        low = min(open_price, close_price)
+            color = "green" if close_price >= open_price else "red"
+            
+            y_price = min_price + (y / (height - 1)) * price_range
 
-        high_wick = "|" if high < max_price else " "
-        low_wick = "|" if low > min_price else " "
+            char = " "
+            if low_price <= y_price <= high_price:
+                char = "│" # Wick
+            if min(open_price, close_price) <= y_price <= max(open_price, close_price):
+                char = "┃" # Body
 
-        bar = Text()
-        bar.append(high_wick + "\n", style=color)
-        bar.append(body + "\n", style=color)
-        bar.append(low_wick, style=color)
-        chart.append(bar)
-        chart.append(" ")
+            row.append(char, style=color)
+        chart.append(row)
+        chart.append("\n")
 
     return chart
 
@@ -170,14 +194,16 @@ def main():
 
             # Update the UI
             order_book_table = create_order_book_table(market_book)
-            bids_asks_chart = create_bids_asks_chart(market_book)
-            candlestick_chart = create_candlestick_chart(prices)
+            bids_asks_chart = create_bids_asks_chart(market_book, width=console.width, height=15)
+            
+            candlesticks = create_candlesticks(prices)
+            candlestick_chart = create_candlestick_chart(candlesticks)
+
             ticker_panel = create_ticker_panel(sim_stock_ticker, last_price, trades)
 
-            layout["header"].update(Panel(f"Market Simulation - Ticker: {sim_stock_ticker}", style="bold blue"))
+            layout["header"].update(Panel(bids_asks_chart, title="Bids/Asks Chart"))
             layout["order_book"].update(order_book_table)
             layout["ticker_price"].update(ticker_panel)
-            layout["bids_asks_chart"].update(Panel(bids_asks_chart, title="Bids/Asks Chart"))
             layout["candlestick_chart"].update(Panel(candlestick_chart, title="Candlestick Chart"))
             
             live.update(layout)
