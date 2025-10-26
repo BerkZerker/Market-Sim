@@ -7,10 +7,9 @@ build/
 dist/
 *.egg-info/
 
-# Virtual environments
+# Virtual environments / caches
 .venv/
-venv/
-env/
+.ruff_cache/
 
 # IDE / Editor specific
 .vscode/
