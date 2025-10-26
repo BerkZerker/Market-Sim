@@ -17,4 +17,8 @@ class User:
         portfolio_str = ", ".join(
             f"{ticker}: {qty}" for ticker, qty in self.portfolio.items() if qty > 0
         )
-        return f"User(ID={str(self.user_id)[-4:]}, Cash=${self.cash:,.2f}, Portfolio=[{portfolio_str}])"
+        return (
+            f"User(ID={str(self.user_id)[-4:]}, "
+            f"Cash=${self.cash:,.2f}, "
+            f"Portfolio=[{portfolio_str}])"
+        )

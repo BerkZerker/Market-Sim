@@ -1,19 +1,19 @@
-import time
 import random
+import time
 from collections import deque
 from itertools import zip_longest
 
-from rich.live import Live
-from rich.table import Table
-from rich.layout import Layout
-from rich.panel import Panel
 from rich.console import Console
+from rich.layout import Layout
+from rich.live import Live
+from rich.panel import Panel
+from rich.table import Table
 from rich.text import Text
 
 from agent import Agent
-from core.order import Order
 from engine.matching_engine import MatchingEngine
 from engine.orderbook import OrderBook
+
 
 def create_layout() -> Layout:
     """
@@ -34,6 +34,7 @@ def create_layout() -> Layout:
     )
     return layout
 
+
 def create_order_book_table(order_book: OrderBook) -> Table:
     """
     Creates a table for the order book.
@@ -48,7 +49,10 @@ def create_order_book_table(order_book: OrderBook) -> Table:
         table.add_row(bid_str, ask_str)
     return table
 
-def create_bids_asks_chart(order_book: OrderBook, width: int = 80, height: int = 10) -> Text:
+
+def create_bids_asks_chart(
+    order_book: OrderBook, width: int = 80, height: int = 10
+) -> Text:
     """
     Creates a horizontal bar chart for the bid and ask volumes.
     """
@@ -76,7 +80,7 @@ def create_bids_asks_chart(order_book: OrderBook, width: int = 80, height: int =
     for ask in asks:
         bin_index = int(((ask.price - min_price) / price_range) * (width - 1))
         ask_bins[bin_index] += ask.quantity
-    
+
     max_vol = 0
     if bid_bins:
         max_vol = max(max_vol, max(bid_bins))
@@ -107,13 +111,14 @@ def create_bids_asks_chart(order_book: OrderBook, width: int = 80, height: int =
 
     return chart
 
+
 def create_candlesticks(prices: deque, bucket_size: int = 5) -> list:
     candlesticks = []
     if len(prices) < bucket_size:
         return []
 
     for i in range(0, len(prices) - len(prices) % bucket_size, bucket_size):
-        bucket = list(prices)[i:i+bucket_size]
+        bucket = list(prices)[i : i + bucket_size]
         open_price = bucket[0]
         close_price = bucket[-1]
         high_price = max(bucket)
@@ -121,7 +126,10 @@ def create_candlesticks(prices: deque, bucket_size: int = 5) -> list:
         candlesticks.append((open_price, high_price, low_price, close_price))
     return candlesticks
 
-def create_candlestick_chart(candlesticks: list, width: int = 50, height: int = 10) -> Text:
+
+def create_candlestick_chart(
+    candlesticks: list, width: int = 50, height: int = 10
+) -> Text:
     """
     Creates a simple candlestick chart.
     """
@@ -136,25 +144,28 @@ def create_candlestick_chart(candlesticks: list, width: int = 50, height: int = 
     chart = Text()
     for y in range(height - 1, -1, -1):
         row = Text()
-        for i, (open_price, high_price, low_price, close_price) in enumerate(candlesticks):
+        for i, (open_price, high_price, low_price, close_price) in enumerate(
+            candlesticks
+        ):
             if i >= width:
                 break
 
             color = "green" if close_price >= open_price else "red"
-            
+
             y_price = min_price + (y / (height - 1)) * price_range
 
             char = " "
             if low_price <= y_price <= high_price:
-                char = "│" # Wick
+                char = "│"  # Wick
             if min(open_price, close_price) <= y_price <= max(open_price, close_price):
-                char = "┃" # Body
+                char = "┃"  # Body
 
             row.append(char, style=color)
         chart.append(row)
         chart.append("\n")
 
     return chart
+
 
 def create_ticker_panel(ticker: str, last_price: float, trades: list) -> Panel:
     """
@@ -174,7 +185,7 @@ def main():
     sim_stock_ticker = "SIM"
     market_book = OrderBook(sim_stock_ticker)
     engine = MatchingEngine(market_book)
-    
+
     agents = [Agent() for _ in range(100)]
     last_price = 100.0
     prices = deque(maxlen=50)
@@ -194,8 +205,10 @@ def main():
 
             # Update the UI
             order_book_table = create_order_book_table(market_book)
-            bids_asks_chart = create_bids_asks_chart(market_book, width=console.width, height=15)
-            
+            bids_asks_chart = create_bids_asks_chart(
+                market_book, width=console.width, height=15
+            )
+
             candlesticks = create_candlesticks(prices)
             candlestick_chart = create_candlestick_chart(candlesticks)
 
@@ -204,10 +217,13 @@ def main():
             layout["header"].update(Panel(bids_asks_chart, title="Bids/Asks Chart"))
             layout["order_book"].update(order_book_table)
             layout["ticker_price"].update(ticker_panel)
-            layout["candlestick_chart"].update(Panel(candlestick_chart, title="Candlestick Chart"))
-            
+            layout["candlestick_chart"].update(
+                Panel(candlestick_chart, title="Candlestick Chart")
+            )
+
             live.update(layout)
             time.sleep(0.1)
+
 
 if __name__ == "__main__":
     main()

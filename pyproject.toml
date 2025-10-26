@@ -16,6 +16,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+    "rich",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/user/market-sim"
@@ -26,3 +29,12 @@ where = ["src"]
 
 [project.scripts]
 market-sim = "main:main"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.format]
+quote-style = "double"

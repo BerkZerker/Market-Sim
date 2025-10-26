@@ -32,13 +32,19 @@ class OrderBook:
             book_str += "  (Empty)\n"
         else:
             for order in self.bids:
-                book_str += f"  Price: {order.price:<8.2f} Qty: {order.quantity:<5} User: {str(order.user_id)[-4:]}\n"
+                book_str += (
+                    f"  Price: {order.price:<8.2f} Qty: {order.quantity:<5} "
+                    f"User: {str(order.user_id)[-4:]}\n"
+                )
 
         book_str += "ASKS:\n"
         if not self.asks:
             book_str += "  (Empty)\n"
         else:
             for order in self.asks:
-                book_str += f"  Price: {order.price:<8.2f} Qty: {order.quantity:<5} User: {str(order.user_id)[-4:]}\n"
+                book_str += (
+                    f"  Price: {order.price:<8.2f} Qty: {order.quantity:<5} "
+                    f"User: {str(order.user_id)[-4:]}\n"
+                )
 
         return book_str

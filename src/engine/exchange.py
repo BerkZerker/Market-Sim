@@ -1,5 +1,3 @@
-from collections import defaultdict
-
 from core.order import Order
 from engine.matching_engine import MatchingEngine
 from engine.orderbook import OrderBook

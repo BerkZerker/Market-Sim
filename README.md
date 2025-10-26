@@ -11,9 +11,9 @@ Started on 10/13/2025
 ### Prerequisites
 
 - Python 3.7+
-- pip
+- [uv](https://github.com/astral-sh/uv)
 
-### Installation
+### Setup
 
 1. Clone the repository:
 
@@ -22,23 +22,17 @@ Started on 10/13/2025
    cd market-sim
    ```
 
-2. Create and activate a virtual environment:
+2. Create and activate a virtual environment using `uv`:
 
    ```bash
-   python -m venv .venv
+   uv venv
    source .venv/bin/activate # On Windows use `.venv\Scripts\activate`
    ```
 
 3. Install the project in editable mode:
 
    ```bash
-   pip install -e .
-   ```
-
-4. Install the requirements:
-
-   ```bash
-   pip install -r requirements.txt
+   uv pip install -e .
    ```
 
 ## Usage
@@ -50,6 +44,20 @@ market-sim
 ```
 
 This will execute the simulation defined in `src/main.py`.
+
+## Linting and Formatting
+
+This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting. To check for linting errors, run:
+
+```bash
+ruff check
+```
+
+To format the code, run:
+
+```bash
+ruff format
+```
 
 ## Project Structure
 
