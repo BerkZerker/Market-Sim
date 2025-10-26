@@ -35,6 +35,12 @@ Started on 10/13/2025
    pip install -e .
    ```
 
+4. Install the requirements:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
 ## Usage
 
 Once the project is installed, you can run the market simulation by typing the following command in your terminal:
