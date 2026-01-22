@@ -15,6 +15,7 @@ class MatchingEngine:
         """
         Processes a new order and returns a list of trades that occurred.
         """
+
         trades_made = []
 
         if side == "buy":

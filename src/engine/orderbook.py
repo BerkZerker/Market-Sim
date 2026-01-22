@@ -26,6 +26,7 @@ class OrderBook:
 
     def __repr__(self):
         """Provides a string representation for easy visualization of the order book."""
+
         book_str = f"--- Order Book for {self.ticker} ---\n"
         book_str += "BIDS:\n"
         if not self.bids:

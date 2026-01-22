@@ -20,6 +20,7 @@ class Exchange:
         Adds a new stock ticker to the exchange, creating an order book and
         matching engine for it.
         """
+
         if ticker not in self.order_books:
             order_book = OrderBook(ticker)
             self.order_books[ticker] = order_book
@@ -40,6 +41,7 @@ class Exchange:
         Returns:
             A list of trades that occurred as a result of the order.
         """
+
         if ticker not in self.matching_engines:
             raise ValueError(f"Ticker '{ticker}' is not listed on this exchange.")
 
@@ -54,6 +56,7 @@ class Exchange:
 
     def get_order_book(self, ticker: str) -> OrderBook:
         """Returns the complete order book for a given ticker."""
+
         if ticker not in self.order_books:
             raise ValueError(f"Ticker '{ticker}' is not listed on this exchange.")
         return self.order_books[ticker]
@@ -68,6 +71,7 @@ class Exchange:
         Returns:
             The current price as a float, or None if no price can be determined.
         """
+
         if ticker in self.last_trades:
             return self.last_trades[ticker]
 
@@ -84,6 +88,7 @@ class Exchange:
         """
         Provides a summary of the current state of all tickers on the exchange.
         """
+
         stats = {}
         for ticker, book in self.order_books.items():
             stats[ticker] = {

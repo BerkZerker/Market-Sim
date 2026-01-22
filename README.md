@@ -19,21 +19,21 @@ A Python-based stock market simulation engine. This project simulates a continuo
 
 ### Installation
 
-1.  **Clone the repository:**
+1. **Clone the repository:**
 
-    ```bash
-    git clone <repository-url>
-    cd market-sim
-    ```
+   ```bash
+   git clone <repository-url>
+   cd market-sim
+   ```
 
-2.  **Set up the environment:**
-    Create a virtual environment and install dependencies using `uv`:
+2. **Set up the environment:**
+   Create a virtual environment and install dependencies using `uv`:
 
-    ```bash
-    uv venv
-    source .venv/bin/activate # On Windows use `.venv\Scripts\activate`
-    uv pip install -e .
-    ```
+   ```bash
+   uv venv
+   source .venv/bin/activate # On Windows use `.venv\Scripts\activate`
+   uv pip install -e .
+   ```
 
 ## Usage
 
@@ -57,7 +57,7 @@ The project is organized into modular components to separate data structures, lo
 
 ### Project Structure
 
-```
+```text
 src/
 ├── agent.py            # Automated trading agent logic
 ├── main.py             # Entry point for the simulation script
@@ -73,12 +73,12 @@ src/
 
 ### Key Components
 
--   **`OrderBook`**: Maintains two sorted lists of orders:
-    -   **Bids**: Sorted descending by price (highest bid first).
-    -   **Asks**: Sorted ascending by price (lowest ask first).
--   **`MatchingEngine`**: The core logic processor. It accepts an incoming order and attempts to match it against the contra-side of the `OrderBook`. If no match is found, the order is added to the book.
--   **`Agent`**: Represents a market participant. Currently, agents place random buy/sell orders around the last traded price to create market noise and liquidity.
--   **`Exchange`**: A wrapper class designed to manage multiple `OrderBook` and `MatchingEngine` instances, facilitating a multi-asset simulation.
+- **`OrderBook`**: Maintains two sorted lists of orders:
+  - **Bids**: Sorted descending by price (highest bid first).
+  - **Asks**: Sorted ascending by price (lowest ask first).
+- **`MatchingEngine`**: The core logic processor. It accepts an incoming order and attempts to match it against the contra-side of the `OrderBook`. If no match is found, the order is added to the book.
+- **`Agent`**: Represents a market participant. Currently, agents place random buy/sell orders around the last traded price to create market noise and liquidity.
+- **`Exchange`**: A wrapper class designed to manage multiple `OrderBook` and `MatchingEngine` instances, facilitating a multi-asset simulation.
 
 ## Development
 
@@ -88,18 +88,14 @@ This project uses modern Python tooling for code quality.
 
 We use [Ruff](https://docs.astral.sh/ruff/) to maintain code style.
 
--   **Check for errors:**
-    ```bash
-    ruff check
-    ```
+- **Check for errors:**
 
--   **Auto-format code:**
-    ```bash
-    ruff format
-    ```
+  ```bash
+  ruff check
+  ```
 
-## Roadmap
+- **Auto-format code:**
 
--   [ ] **Web Frontend**: Visualize the order book and price history in a web dashboard.
--   [ ] **Smarter Agents**: Implement agents with basic strategies (e.g., mean reversion, momentum).
--   [ ] **API**: Expose the exchange via a REST or WebSocket API for external bots to connect.
+  ```bash
+  ruff format
+  ```
