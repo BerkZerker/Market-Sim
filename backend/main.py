@@ -92,7 +92,7 @@ async def lifespan(app: FastAPI):
     # Start market maker bots
     from bots.market_maker import MarketMakerBot
 
-    bot = MarketMakerBot(exchange, mm_user)
+    bot = MarketMakerBot(exchange, mm_user, session_factory=async_session)
     bot_task = asyncio.create_task(bot.run())
     logger.info("Market maker bot started")
 
@@ -112,6 +112,7 @@ async def lifespan(app: FastAPI):
         for user in exchange.users.values():
             if not user.is_market_maker:
                 await sync_user_to_db(session, user)
+        await session.commit()
     logger.info("User state persisted to database")
 
 
@@ -138,9 +139,44 @@ app.include_router(portfolio_router)
 app.include_router(leaderboard_router)
 
 
+async def _authenticate_ws(
+    token: str | None = None, api_key: str | None = None
+) -> str | None:
+    """Validate JWT or API key for WebSocket connections. Returns user_id or None."""
+    from api.dependencies import decode_jwt
+
+    if token:
+        user_id = decode_jwt(token)
+        if user_id:
+            return user_id
+
+    if api_key:
+        from db import database as db_module
+        from db.crud import get_user_by_api_key
+
+        async with db_module.async_session() as session:
+            db_user = await get_user_by_api_key(session, api_key)
+            if db_user:
+                return db_user.id
+
+    return None
+
+
 @app.websocket("/ws/{channel}")
-async def ws_endpoint(websocket: WebSocket, channel: str):
-    await manager.connect(websocket, channel)
+async def ws_endpoint(
+    websocket: WebSocket,
+    channel: str,
+    token: str | None = None,
+    api_key: str | None = None,
+):
+    user_id = await _authenticate_ws(token, api_key)
+    # All channels remain public — auth is optional, stored for future
+    # user-specific channels (e.g., portfolio updates, private notifications).
+    # To require auth for a channel:
+    #   if channel.startswith("private:") and user_id is None:
+    #       await websocket.close(code=4001, reason="Authentication required")
+    #       return
+    await manager.connect(websocket, channel, user_id=user_id)
     try:
         while True:
             await websocket.receive_text()

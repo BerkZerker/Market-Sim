@@ -699,3 +699,244 @@ async def test_rate_limit_exceeded(client: AsyncClient):
         assert resp.status_code == 429
     finally:
         app.dependency_overrides.pop(get_rate_limiter, None)
+
+
+# --- Phase 3: Data Consistency tests ---
+
+
+@pytest.mark.asyncio
+async def test_resting_order_filled_quantity_updates(client: AsyncClient):
+    """Resting order's filled_quantity updates as partial fills occur."""
+    from uuid import UUID
+
+    from api.dependencies import get_exchange
+
+    exchange = get_exchange()
+
+    # Register seller and two buyers
+    resp = await client.post(
+        "/api/register",
+        json={"username": "fill_seller", "password": "pass1234"},
+    )
+    seller_data = resp.json()
+    seller_key = seller_data["api_key"]
+    seller_id = seller_data["user_id"]
+
+    # Give seller shares
+    seller_user = exchange.get_user(UUID(seller_id))
+    seller_user.portfolio["FUN"] = 100
+
+    # Seller places a resting ask for 10 shares
+    resp = await client.post(
+        "/api/orders",
+        json={"ticker": "FUN", "side": "sell", "price": 75.0, "quantity": 10},
+        headers={"X-API-Key": seller_key},
+    )
+    assert resp.status_code == 200
+    sell_order_id = resp.json()["order_id"]
+    assert resp.json()["status"] == "open"
+
+    # Buyer A buys 5 shares
+    resp = await client.post(
+        "/api/register",
+        json={"username": "fill_buyerA", "password": "pass1234"},
+    )
+    buyer_a_key = resp.json()["api_key"]
+
+    resp = await client.post(
+        "/api/orders",
+        json={"ticker": "FUN", "side": "buy", "price": 75.0, "quantity": 5},
+        headers={"X-API-Key": buyer_a_key},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "filled"
+
+    # Check seller's resting order: filled_quantity=5, status=partial
+    resp = await client.get("/api/orders", headers={"X-API-Key": seller_key})
+    orders = resp.json()
+    assert len(orders) == 1
+    assert orders[0]["order_id"] == sell_order_id
+    assert orders[0]["filled_quantity"] == 5
+    assert orders[0]["status"] == "partial"
+
+    # Buyer B buys remaining 5
+    resp = await client.post(
+        "/api/register",
+        json={"username": "fill_buyerB", "password": "pass1234"},
+    )
+    buyer_b_key = resp.json()["api_key"]
+
+    resp = await client.post(
+        "/api/orders",
+        json={"ticker": "FUN", "side": "buy", "price": 75.0, "quantity": 5},
+        headers={"X-API-Key": buyer_b_key},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "filled"
+
+    # Seller's order should now be fully filled — no longer in open orders
+    resp = await client.get("/api/orders", headers={"X-API-Key": seller_key})
+    assert resp.json() == []
+
+
+@pytest.mark.asyncio
+async def test_place_order_atomic_consistency(client: AsyncClient):
+    """After a fill, order + trade + balance are all consistent in DB."""
+    from uuid import UUID
+
+    from api.dependencies import get_exchange
+
+    exchange = get_exchange()
+
+    # Register seller
+    resp = await client.post(
+        "/api/register",
+        json={"username": "atomic_seller", "password": "pass1234"},
+    )
+    seller_data = resp.json()
+    seller_key = seller_data["api_key"]
+    seller_id = seller_data["user_id"]
+
+    seller_user = exchange.get_user(UUID(seller_id))
+    seller_user.portfolio["MEME"] = 50
+
+    # Register buyer
+    resp = await client.post(
+        "/api/register",
+        json={"username": "atomic_buyer", "password": "pass1234"},
+    )
+    buyer_data = resp.json()
+    buyer_key = buyer_data["api_key"]
+
+    # Seller places ask
+    resp = await client.post(
+        "/api/orders",
+        json={"ticker": "MEME", "side": "sell", "price": 60.0, "quantity": 3},
+        headers={"X-API-Key": seller_key},
+    )
+    assert resp.status_code == 200
+
+    # Buyer fills it
+    resp = await client.post(
+        "/api/orders",
+        json={"ticker": "MEME", "side": "buy", "price": 60.0, "quantity": 3},
+        headers={"X-API-Key": buyer_key},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "filled"
+
+    # Buyer's trade history should have the trade
+    resp = await client.get(
+        "/api/trades",
+        headers={"X-API-Key": buyer_key},
+    )
+    trades = [t for t in resp.json() if t["ticker"] == "MEME"]
+    assert len(trades) == 1
+    assert trades[0]["price"] == 60.0
+    assert trades[0]["quantity"] == 3
+
+    # Buyer portfolio: cash decreased by 180, has 3 MEME shares
+    resp = await client.get("/api/portfolio", headers={"X-API-Key": buyer_key})
+    buyer_portfolio = resp.json()
+    assert buyer_portfolio["cash"] == 10000.0 - 180.0
+    meme_holding = [h for h in buyer_portfolio["holdings"] if h["ticker"] == "MEME"]
+    assert len(meme_holding) == 1
+    assert meme_holding[0]["quantity"] == 3
+
+
+@pytest.mark.asyncio
+async def test_market_maker_persists_orders(db_engine, db_session):
+    """MarketMakerBot persists orders to DB when given a session factory."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    from bots.market_maker import MarketMakerBot
+    from config import settings
+    from core.user import User
+    from db.models import OrderModel
+    from engine.exchange import Exchange
+
+    exchange = Exchange()
+    for ticker, price in settings.TICKERS.items():
+        exchange.add_ticker(ticker, initial_price=price)
+
+    mm_user = User(
+        user_id=uuid.uuid4(),
+        username="__mm_test__",
+        cash=0,
+        is_market_maker=True,
+    )
+    exchange.register_user(mm_user)
+
+    session_factory = async_sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+    bot = MarketMakerBot(exchange, mm_user, session_factory=session_factory)
+
+    # Quote one ticker
+    await bot._quote_ticker("FUN")
+
+    # Verify orders were persisted
+    from sqlalchemy import select
+
+    result = await db_session.execute(
+        select(OrderModel).where(OrderModel.user_id == str(mm_user.user_id))
+    )
+    orders = result.scalars().all()
+    assert len(orders) == 2  # bid + ask
+    sides = {o.side for o in orders}
+    assert sides == {"buy", "sell"}
+
+
+@pytest.mark.asyncio
+async def test_leaderboard_crud_no_n_plus_one(db_session):
+    """get_leaderboard uses eager loading instead of N+1 queries."""
+    from db.crud import create_user, get_leaderboard, update_holding
+
+    # Create two users with holdings
+    user1 = await create_user(db_session, "lb_user1", "hash1")
+    user2 = await create_user(db_session, "lb_user2", "hash2")
+    await update_holding(db_session, user1.id, "FUN", 10)
+    await update_holding(db_session, user2.id, "MEME", 5)
+    await db_session.commit()
+
+    leaderboard = await get_leaderboard(db_session, limit=10)
+    assert len(leaderboard) == 2
+    usernames = {entry["username"] for entry in leaderboard}
+    assert "lb_user1" in usernames
+    assert "lb_user2" in usernames
+
+    # Verify holdings are included
+    user1_entry = [e for e in leaderboard if e["username"] == "lb_user1"][0]
+    assert len(user1_entry["holdings"]) == 1
+    assert user1_entry["holdings"][0]["ticker"] == "FUN"
+
+
+@pytest.mark.asyncio
+async def test_ws_auth_with_valid_jwt():
+    """_authenticate_ws returns user_id for a valid JWT."""
+    from api.dependencies import create_jwt
+
+    user_id = str(uuid.uuid4())
+    token = create_jwt(user_id)
+
+    from main import _authenticate_ws
+
+    result = await _authenticate_ws(token=token)
+    assert result == user_id
+
+
+@pytest.mark.asyncio
+async def test_ws_auth_with_api_key(client: AsyncClient):
+    """_authenticate_ws returns user_id for a valid API key."""
+    resp = await client.post(
+        "/api/register",
+        json={"username": "ws_auth_user", "password": "pass1234"},
+    )
+    data = resp.json()
+    api_key = data["api_key"]
+    user_id = data["user_id"]
+
+    from main import _authenticate_ws
+
+    result = await _authenticate_ws(api_key=api_key)
+    assert result == user_id

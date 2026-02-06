@@ -13,6 +13,7 @@ from db.crud import (
     record_order,
     record_trade,
     sync_user_to_db,
+    update_order_fill,
 )
 from engine.exchange import Exchange
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -145,6 +146,25 @@ async def place_order(
                 if counterparty and not counterparty.is_market_maker:
                     await sync_user_to_db(db, counterparty)
 
+    # Update filled_quantity for resting orders that were matched
+    resting_fills: dict[str, int] = {}
+    for trade in trades:
+        resting_id = str(
+            trade.sell_order_id if req.side == "buy" else trade.buy_order_id
+        )
+        if resting_id != str(order.order_id):
+            prev = resting_fills.get(resting_id, 0)
+            resting_fills[resting_id] = prev + trade.quantity
+
+    for resting_id, additional_fill in resting_fills.items():
+        db_resting = await get_order_by_id(db, resting_id)
+        if db_resting is not None:
+            new_filled = db_resting.filled_quantity + additional_fill
+            new_status = "filled" if new_filled >= db_resting.quantity else "partial"
+            await update_order_fill(db, resting_id, new_filled, new_status)
+
+    await db.commit()
+
     trade_responses = [
         TradeResponse(
             trade_id=str(t.trade_id),
@@ -225,6 +245,8 @@ async def cancel_order(
 
     # 6. Persist refunded balance
     await sync_user_to_db(db, user)
+
+    await db.commit()
 
     return CancelResponse(
         order_id=order_id,

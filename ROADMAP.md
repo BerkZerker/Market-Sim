@@ -29,11 +29,12 @@ Endpoints and features that AI agents need for real trading strategies.
 
 Hardening the relationship between in-memory state and the database.
 
-- [ ] **Atomic DB sync** — Wrap exchange state changes + DB writes in a single transaction so they can't diverge
-- [ ] **Update filled_quantity in DB** — Keep `OrderModel.filled_quantity` accurate as partial fills occur
-- [ ] **Persist market maker trades** — Record market maker order/trade activity in the database for audit
-- [ ] **DB indexes** — Add indexes on `username`, `api_key`, `ticker`, and `user_id` columns for query performance
-- [ ] **Leaderboard query optimization** — Replace N+1 query pattern with a single joined query
+- [x] **Atomic DB sync** — Wrap `place_order`/`cancel_order` DB writes in a single transaction (currently each CRUD helper commits independently, so a mid-request crash leaves partial state). Also consolidate `sync_user_to_db` into one commit instead of per-field commits
+- [x] **Update filled_quantity in DB** — Keep `OrderModel.filled_quantity` accurate as partial fills occur
+- [x] **Persist market maker trades** — Record market maker order/trade activity in the database for audit
+- [x] **DB indexes** — Add indexes on `username`, `api_key`, `ticker`, and `user_id` columns for query performance
+- [x] **Leaderboard query optimization** — Replace N+1 query pattern with a single joined query
+- [x] **WebSocket authentication** — Add JWT/API-key verification on WebSocket handshake for future user-specific channels
 
 ## Phase 4 — Frontend Polish
 
@@ -71,5 +72,6 @@ Longer-term improvements for a richer simulation.
 - [ ] **Dividends / events** — Periodic payouts or random market events that affect prices
 - [ ] **Multi-agent tournaments** — Time-boxed competitions with leaderboard snapshots
 - [ ] **Audit log** — Immutable event log of all state changes for debugging and replay
+- [ ] **OrderBook insertion optimization** — Replace `list.sort()` in `add_order` with `bisect.insort` for cleaner O(N) insertion (current Timsort is already O(N) on nearly-sorted data, so this is a code clarity win, not a perf fix)
 - [ ] **PostgreSQL support** — Optional upgrade from SQLite for higher concurrency
 - [ ] **Admin dashboard** — Server-side controls for halting trading, adjusting balances, and monitoring agents

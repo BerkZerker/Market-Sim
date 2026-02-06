@@ -26,22 +26,22 @@ uv run python -m pytest
 
 ## API Endpoints
 
-| Method | Path                           | Auth | Purpose                                |
-| ------ | ------------------------------ | ---- | -------------------------------------- |
-| POST   | /api/register                  | No   | Create account → api_key + jwt         |
-| POST   | /api/login                     | No   | Login → jwt                            |
-| POST   | /api/orders                    | Yes  | Place order (GTC/IOC/FOK, rate-limited)|
-| DELETE | /api/orders/{id}               | Yes  | Cancel resting order (rate-limited)    |
-| GET    | /api/orders                    | Yes  | List open/partial orders               |
-| GET    | /api/trades                    | Yes  | Trade history (optional ticker filter) |
-| GET    | /api/market/tickers            | No   | All tickers + prices                   |
-| GET    | /api/market/{ticker}           | No   | Ticker detail + depth                  |
-| GET    | /api/market/{ticker}/orderbook | No   | Aggregated book                        |
-| GET    | /api/market/{ticker}/history   | No   | OHLCV candles (1m/5m/15m/1h/1d)       |
-| GET    | /api/portfolio                 | Yes  | Holdings + cash + buying_power         |
-| GET    | /api/leaderboard               | No   | Top 50 by total value                  |
-| GET    | /api/health                    | No   | Health check                           |
-| WS     | /ws/{channel}                  | No   | Real-time data                 |
+| Method | Path                           | Auth | Purpose                                 |
+| ------ | ------------------------------ | ---- | --------------------------------------- |
+| POST   | /api/register                  | No   | Create account → api_key + jwt          |
+| POST   | /api/login                     | No   | Login → jwt                             |
+| POST   | /api/orders                    | Yes  | Place order (GTC/IOC/FOK, rate-limited) |
+| DELETE | /api/orders/{id}               | Yes  | Cancel resting order (rate-limited)     |
+| GET    | /api/orders                    | Yes  | List open/partial orders                |
+| GET    | /api/trades                    | Yes  | Trade history (optional ticker filter)  |
+| GET    | /api/market/tickers            | No   | All tickers + prices                    |
+| GET    | /api/market/{ticker}           | No   | Ticker detail + depth                   |
+| GET    | /api/market/{ticker}/orderbook | No   | Aggregated book                         |
+| GET    | /api/market/{ticker}/history   | No   | OHLCV candles (1m/5m/15m/1h/1d)         |
+| GET    | /api/portfolio                 | Yes  | Holdings + cash + buying_power          |
+| GET    | /api/leaderboard               | No   | Top 50 by total value                   |
+| GET    | /api/health                    | No   | Health check                            |
+| WS     | /ws/{channel}                  | No   | Real-time data                          |
 
 ## Workflow — READ BEFORE STARTING ANY TASK
 
@@ -95,12 +95,16 @@ Every change must pass these checks:
 
 9. **Rate limiting**: `RateLimiter` in `api/rate_limit.py` — sliding window per user ID. Applied to `POST /api/orders` and `DELETE /api/orders/{id}`. Configurable via `config.settings.RATE_LIMIT_REQUESTS` and `RATE_LIMIT_WINDOW`.
 
+10. **Atomic DB writes**: CRUD helpers use `flush()` (not `commit()`). Route handlers call `db.commit()` once at the end, making all DB writes in a request atomic. The market maker bot commits in its own session after each quote cycle.
+
+11. **WebSocket auth**: `ws_endpoint` accepts optional `token` and `api_key` query params. `_authenticate_ws()` validates them. All channels remain public; auth is stored per-connection for future user-specific channels.
+
 ## Testing
 
 - **Run tests**: `uv run python -m pytest` — bare `pytest` won't work (not installed globally)
 - `asyncio_mode = "auto"` (configured in `pyproject.toml`)
 - `pythonpath = ["backend"]` — imports resolve from `backend/`
-- 57 tests: 27 engine unit (`test_exchange.py`) + 30 API integration (`test_api.py`)
+- 63 tests: 27 engine unit (`test_exchange.py`) + 36 API integration (`test_api.py`)
 - `conftest.py` creates an in-memory SQLite DB + fresh Exchange per test
 
 ## Code Style
@@ -131,4 +135,4 @@ Do this as part of the task, not as a separate step.
 
 ## Known Issues (see ROADMAP.md)
 
-Phases 1 and 2 are complete. See ROADMAP.md for Phase 3+ items.
+Phases 1, 2, and 3 are complete. See ROADMAP.md for Phase 4+ items.

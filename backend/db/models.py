@@ -10,7 +10,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -36,13 +36,17 @@ class UserModel(Base):
     is_market_maker: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
+    holdings: Mapped[list["PortfolioHolding"]] = relationship(
+        "PortfolioHolding", lazy="raise"
+    )
+
 
 class PortfolioHolding(Base):
     __tablename__ = "portfolio_holdings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(
-        String, ForeignKey("users.id"), nullable=False
+        String, ForeignKey("users.id"), nullable=False, index=True
     )
     ticker: Mapped[str] = mapped_column(String, nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, default=0)
@@ -55,9 +59,9 @@ class OrderModel(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     user_id: Mapped[str] = mapped_column(
-        String, ForeignKey("users.id"), nullable=False
+        String, ForeignKey("users.id"), nullable=False, index=True
     )
-    ticker: Mapped[str] = mapped_column(String, nullable=False)
+    ticker: Mapped[str] = mapped_column(String, nullable=False, index=True)
     side: Mapped[str] = mapped_column(String, nullable=False)
     price: Mapped[float] = mapped_column(Float, nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -71,14 +75,14 @@ class TradeModel(Base):
     __tablename__ = "trades"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
-    ticker: Mapped[str] = mapped_column(String, nullable=False)
+    ticker: Mapped[str] = mapped_column(String, nullable=False, index=True)
     price: Mapped[float] = mapped_column(Float, nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     buyer_id: Mapped[str] = mapped_column(
-        String, ForeignKey("users.id"), nullable=False
+        String, ForeignKey("users.id"), nullable=False, index=True
     )
     seller_id: Mapped[str] = mapped_column(
-        String, ForeignKey("users.id"), nullable=False
+        String, ForeignKey("users.id"), nullable=False, index=True
     )
     buy_order_id: Mapped[str] = mapped_column(String, nullable=False)
     sell_order_id: Mapped[str] = mapped_column(String, nullable=False)

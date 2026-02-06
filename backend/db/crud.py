@@ -21,7 +21,7 @@ async def create_user(
         api_key=api_key,
     )
     session.add(db_user)
-    await session.commit()
+    await session.flush()
     await session.refresh(db_user)
     return db_user
 
@@ -57,7 +57,7 @@ async def update_user_cash(
     await session.execute(
         update(UserModel).where(UserModel.id == user_id).values(cash=cash)
     )
-    await session.commit()
+    await session.flush()
 
 
 async def get_holdings(
@@ -86,7 +86,7 @@ async def update_holding(
             user_id=user_id, ticker=ticker, quantity=quantity
         )
         session.add(holding)
-    await session.commit()
+    await session.flush()
 
 
 async def record_order(
@@ -113,7 +113,7 @@ async def record_order(
         time_in_force=time_in_force,
     )
     session.add(db_order)
-    await session.commit()
+    await session.flush()
     return db_order
 
 
@@ -139,7 +139,7 @@ async def record_trade(
         sell_order_id=sell_order_id,
     )
     session.add(db_trade)
-    await session.commit()
+    await session.flush()
     return db_trade
 
 
@@ -179,16 +179,18 @@ async def get_trades_for_ticker(
 
 
 async def get_leaderboard(session: AsyncSession, limit: int = 50) -> list[dict]:
+    from sqlalchemy.orm import selectinload
+
     result = await session.execute(
         select(UserModel)
         .where(UserModel.is_market_maker.is_(False))
+        .options(selectinload(UserModel.holdings))
         .order_by(UserModel.cash.desc())
         .limit(limit)
     )
-    users = result.scalars().all()
+    users = result.scalars().unique().all()
     leaderboard = []
     for user in users:
-        holdings = await get_holdings(session, user.id)
         leaderboard.append(
             {
                 "user_id": user.id,
@@ -196,7 +198,7 @@ async def get_leaderboard(session: AsyncSession, limit: int = 50) -> list[dict]:
                 "cash": user.cash,
                 "holdings": [
                     {"ticker": h.ticker, "quantity": h.quantity}
-                    for h in holdings
+                    for h in user.holdings
                     if h.quantity > 0
                 ],
             }
@@ -253,11 +255,22 @@ async def get_order_by_id(
     return result.scalar_one_or_none()
 
 
+async def update_order_fill(
+    session: AsyncSession, order_id: str, filled_quantity: int, status: str
+) -> None:
+    await session.execute(
+        update(OrderModel)
+        .where(OrderModel.id == order_id)
+        .values(filled_quantity=filled_quantity, status=status)
+    )
+    await session.flush()
+
+
 async def cancel_order_db(session: AsyncSession, order_id: str) -> None:
     await session.execute(
         update(OrderModel).where(OrderModel.id == order_id).values(status="cancelled")
     )
-    await session.commit()
+    await session.flush()
 
 
 async def sync_user_to_db(session: AsyncSession, user: User) -> None:

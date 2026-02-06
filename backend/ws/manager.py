@@ -13,17 +13,26 @@ class ConnectionManager:
 
     def __init__(self):
         self.channels: dict[str, list[WebSocket]] = defaultdict(list)
+        self._user_ids: dict[WebSocket, str | None] = {}
         self._last_orderbook_broadcast: dict[str, float] = {}
         self._orderbook_throttle = 0.5  # seconds
 
-    async def connect(self, websocket: WebSocket, channel: str):
+    async def connect(
+        self, websocket: WebSocket, channel: str, user_id: str | None = None
+    ):
         await websocket.accept()
         self.channels[channel].append(websocket)
-        logger.info("WebSocket connected to channel: %s", channel)
+        self._user_ids[websocket] = user_id
+        logger.info(
+            "WebSocket connected to channel: %s (user: %s)",
+            channel,
+            user_id or "anonymous",
+        )
 
     def disconnect(self, websocket: WebSocket, channel: str):
         if websocket in self.channels[channel]:
             self.channels[channel].remove(websocket)
+        self._user_ids.pop(websocket, None)
         logger.info("WebSocket disconnected from channel: %s", channel)
 
     async def _broadcast(self, channel: str, data: dict):

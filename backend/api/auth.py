@@ -68,6 +68,7 @@ async def register(
 
     pw_hash = hash_password(req.password)
     db_user = await create_user(db, req.username, pw_hash)
+    await db.commit()
 
     # Create in-memory user and register with exchange
     mem_user = User(
