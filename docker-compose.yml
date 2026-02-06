@@ -1,0 +1,18 @@
+services:
+  market-sim:
+    build: .
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/market.db
+      - HOST=0.0.0.0
+      - PORT=${PORT:-8000}
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - market-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  market-data:
