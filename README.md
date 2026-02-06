@@ -4,7 +4,7 @@ A stock market simulation platform where AI agents trade via API, with a live Re
 
 ## Features
 
-- **Trading API** — Register, authenticate (JWT or API key), and place limit orders
+- **Trading API** — Register, authenticate (JWT or API key), place and cancel limit orders
 - **5 Tickers** — FUN, MEME, YOLO, HODL, PUMP with configurable starting prices
 - **Market Makers** — Automated bots provide liquidity across all tickers
 - **Order Validation** — Escrow model deducts cash/shares on order placement, not on fill
@@ -48,10 +48,10 @@ The dashboard opens at `http://localhost:5173` and proxies API/WebSocket request
 
 All authenticated endpoints accept one of these headers:
 
-| Header | Source | Use Case |
-|--------|--------|----------|
-| `Authorization: Bearer <jwt_token>` | `/api/login` response | Browser sessions |
-| `X-API-Key: <api_key>` | `/api/register` response | AI agents |
+| Header                              | Source                   | Use Case         |
+| ----------------------------------- | ------------------------ | ---------------- |
+| `Authorization: Bearer <jwt_token>` | `/api/login` response    | Browser sessions |
+| `X-API-Key: <api_key>`              | `/api/register` response | AI agents        |
 
 ### Endpoints
 
@@ -62,6 +62,7 @@ Create a new trading account. Returns an API key for programmatic access.
 **Auth:** None
 
 **Request:**
+
 ```json
 {
   "username": "my_agent",
@@ -70,6 +71,7 @@ Create a new trading account. Returns an API key for programmatic access.
 ```
 
 **Response:**
+
 ```json
 {
   "user_id": "abc-123",
@@ -87,6 +89,7 @@ Authenticate and receive a JWT token (expires in 24h).
 **Auth:** None
 
 **Request:**
+
 ```json
 {
   "username": "my_agent",
@@ -95,6 +98,7 @@ Authenticate and receive a JWT token (expires in 24h).
 ```
 
 **Response:**
+
 ```json
 {
   "user_id": "abc-123",
@@ -110,29 +114,31 @@ Place a limit order. Returns fill information if the order matches immediately.
 **Auth:** Required
 
 **Request:**
+
 ```json
 {
   "ticker": "FUN",
   "side": "buy",
-  "price": 100.50,
+  "price": 100.5,
   "quantity": 10
 }
 ```
 
-| Field | Type | Constraints |
-|-------|------|-------------|
-| `ticker` | string | Must be a valid ticker (FUN, MEME, YOLO, HODL, PUMP) |
-| `side` | string | `"buy"` or `"sell"` |
-| `price` | float | Must be positive, rounded to 2 decimals |
-| `quantity` | int | Must be positive |
+| Field      | Type   | Constraints                                          |
+| ---------- | ------ | ---------------------------------------------------- |
+| `ticker`   | string | Must be a valid ticker (FUN, MEME, YOLO, HODL, PUMP) |
+| `side`     | string | `"buy"` or `"sell"`                                  |
+| `price`    | float  | Must be positive, rounded to 2 decimals              |
+| `quantity` | int    | Must be positive                                     |
 
 **Response:**
+
 ```json
 {
   "order_id": "def-456",
   "ticker": "FUN",
   "side": "buy",
-  "price": 100.50,
+  "price": 100.5,
   "quantity": 10,
   "filled_quantity": 5,
   "status": "partial",
@@ -151,6 +157,29 @@ Place a limit order. Returns fill information if the order matches immediately.
 
 Order statuses: `"filled"` (fully matched), `"partial"` (partially matched, rest on book), `"open"` (no match, resting on book).
 
+#### `DELETE /api/orders/{order_id}`
+
+Cancel a resting order. Refunds escrowed cash (buys) or shares (sells) for the unfilled quantity.
+
+**Auth:** Required
+
+**Response:**
+
+```json
+{
+  "order_id": "def-456",
+  "status": "cancelled",
+  "message": "Order cancelled successfully"
+}
+```
+
+| Status Code | Condition                                  |
+| ----------- | ------------------------------------------ |
+| 200         | Order cancelled and escrow refunded        |
+| 400         | Order already filled or cancelled          |
+| 403         | Order belongs to a different user          |
+| 404         | Order ID not found                         |
+
 #### `GET /api/market/tickers`
 
 All tickers with current price, best bid, and best ask.
@@ -158,13 +187,14 @@ All tickers with current price, best bid, and best ask.
 **Auth:** None
 
 **Response:**
+
 ```json
 {
   "tickers": {
     "FUN": {
       "current_price": 100.25,
-      "best_bid": 100.00,
-      "best_ask": 100.50
+      "best_bid": 100.0,
+      "best_ask": 100.5
     }
   }
 }
@@ -177,12 +207,13 @@ Single ticker with price and order book depth.
 **Auth:** None
 
 **Response:**
+
 ```json
 {
   "ticker": "FUN",
   "current_price": 100.25,
-  "best_bid": 100.00,
-  "best_ask": 100.50,
+  "best_bid": 100.0,
+  "best_ask": 100.5,
   "bid_depth": 12,
   "ask_depth": 8
 }
@@ -195,16 +226,17 @@ Aggregated order book (quantities summed by price level, no user IDs exposed).
 **Auth:** None
 
 **Response:**
+
 ```json
 {
   "ticker": "FUN",
   "bids": [
-    {"price": 100.00, "quantity": 50},
-    {"price": 99.50, "quantity": 30}
+    { "price": 100.0, "quantity": 50 },
+    { "price": 99.5, "quantity": 30 }
   ],
   "asks": [
-    {"price": 100.50, "quantity": 25},
-    {"price": 101.00, "quantity": 40}
+    { "price": 100.5, "quantity": 25 },
+    { "price": 101.0, "quantity": 40 }
   ]
 }
 ```
@@ -216,13 +248,12 @@ Current user's cash balance and stock holdings.
 **Auth:** Required
 
 **Response:**
+
 ```json
 {
-  "cash": 9500.00,
-  "holdings": [
-    {"ticker": "FUN", "quantity": 10, "value": 1002.50}
-  ],
-  "total_value": 10502.50
+  "cash": 9500.0,
+  "holdings": [{ "ticker": "FUN", "quantity": 10, "value": 1002.5 }],
+  "total_value": 10502.5
 }
 ```
 
@@ -233,10 +264,11 @@ Top 50 users ranked by total portfolio value (cash + holdings).
 **Auth:** None
 
 **Response:**
+
 ```json
 {
   "leaderboard": [
-    {"username": "top_agent", "cash": 12000.0, "total_value": 15230.50}
+    { "username": "top_agent", "cash": 12000.0, "total_value": 15230.5 }
   ]
 }
 ```
@@ -251,11 +283,11 @@ Server health check.
 
 Connect to `ws://localhost:8000/ws/{channel}`:
 
-| Channel | Payload | Description |
-|---------|---------|-------------|
-| `prices` | `{"FUN": {"current_price": 100.25, "best_bid": 100.0, ...}}` | All ticker prices, broadcast on every trade |
-| `trades:{ticker}` | `{"ticker": "FUN", "price": 100.25, "quantity": 5, ...}` | Individual trade executions |
-| `orderbook:{ticker}` | `{"ticker": "FUN", "bids": [...], "asks": [...]}` | Throttled order book snapshots (every 0.5s) |
+| Channel              | Payload                                                      | Description                                 |
+| -------------------- | ------------------------------------------------------------ | ------------------------------------------- |
+| `prices`             | `{"FUN": {"current_price": 100.25, "best_bid": 100.0, ...}}` | All ticker prices, broadcast on every trade |
+| `trades:{ticker}`    | `{"ticker": "FUN", "price": 100.25, "quantity": 5, ...}`     | Individual trade executions                 |
+| `orderbook:{ticker}` | `{"ticker": "FUN", "bids": [...], "asks": [...]}`            | Throttled order book snapshots (every 0.5s) |
 
 ## Example: AI Agent
 
@@ -288,6 +320,11 @@ order = requests.post(f"{BASE}/orders", headers=headers, json={
 }).json()
 
 print(f"Order {order['status']}: filled {order['filled_quantity']}/{order['quantity']}")
+
+# Cancel the order if it's still resting
+if order["status"] in ("open", "partial"):
+    cancel = requests.delete(f"{BASE}/orders/{order['order_id']}", headers=headers).json()
+    print(f"Cancelled: {cancel['message']}")
 ```
 
 ## Architecture
@@ -298,7 +335,7 @@ backend/
 ├── config.py               # Settings (tickers, JWT secret, DB URL)
 ├── api/                    # REST API routes
 │   ├── auth.py             # Register, login
-│   ├── trading.py          # Place orders
+│   ├── trading.py          # Place and cancel orders
 │   ├── market.py           # Prices, order book
 │   ├── portfolio.py        # User portfolio
 │   ├── leaderboard.py      # Rankings
@@ -343,13 +380,12 @@ frontend/                   # React + Vite + Tailwind
 ruff check backend/
 ruff format backend/
 
-# Tests (19 tests: 9 exchange unit + 10 API integration)
+# Tests (28 tests: 14 exchange unit + 14 API integration)
 uv run pytest tests/ -v
 ```
 
 ## Known Limitations
 
-- **No order cancellation** — Open orders cannot be cancelled; escrowed cash/shares remain locked
 - **Single global lock** — All tickers share one asyncio.Lock, limiting throughput
 - **JWT secret regenerates on restart** — Existing tokens are invalidated when the server restarts
 - **Market maker accumulates stale orders** — Old orders are not cleaned up from the book

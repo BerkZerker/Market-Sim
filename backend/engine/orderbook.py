@@ -1,3 +1,5 @@
+import uuid
+
 from core.order import Order
 
 
@@ -23,6 +25,14 @@ class OrderBook:
             # Sort asks from lowest to highest price (ascending).
             # If prices are equal, the older order (smaller timestamp) comes first.
             self.asks.sort(key=lambda o: (o.price, o.timestamp))
+
+    def remove_order(self, order_id: uuid.UUID, side: str) -> Order | None:
+        """Remove an order by ID from the specified side. Returns the removed Order or None."""
+        book = self.bids if side == "buy" else self.asks
+        for i, order in enumerate(book):
+            if order.order_id == order_id:
+                return book.pop(i)
+        return None
 
     def __repr__(self):
         """Provides a string representation for easy visualization of the order book."""

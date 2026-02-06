@@ -1,7 +1,15 @@
+from uuid import UUID
+
 from api.dependencies import get_current_user, get_db, get_exchange
 from core.order import Order
 from core.user import User
-from db.crud import record_order, record_trade, sync_user_to_db
+from db.crud import (
+    cancel_order_db,
+    get_order_by_id,
+    record_order,
+    record_trade,
+    sync_user_to_db,
+)
 from engine.exchange import Exchange
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -141,4 +149,66 @@ async def place_order(
         filled_quantity=filled_qty,
         status=order_status,
         trades=trade_responses,
+    )
+
+
+class CancelResponse(BaseModel):
+    order_id: str
+    status: str
+    message: str
+
+
+@router.delete("/orders/{order_id}", response_model=CancelResponse)
+async def cancel_order(
+    order_id: str,
+    user: User = Depends(get_current_user),
+    exchange: Exchange = Depends(get_exchange),
+    db: AsyncSession = Depends(get_db),
+):
+    # 1. Look up order in DB
+    db_order = await get_order_by_id(db, order_id)
+    if db_order is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found",
+        )
+
+    # 2. Ownership check
+    if db_order.user_id != str(user.user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot cancel another user's order",
+        )
+
+    # 3. Status check — only open or partial orders can be cancelled
+    if db_order.status not in ("open", "partial"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot cancel order with status '{db_order.status}'",
+        )
+
+    # 4. Remove from in-memory book and refund escrow
+    try:
+        await exchange.cancel_order(
+            ticker=db_order.ticker,
+            order_id=UUID(order_id),
+            side=db_order.side,
+            user_id=user.user_id,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+    # 5. Update DB status
+    await cancel_order_db(db, order_id)
+
+    # 6. Persist refunded balance
+    await sync_user_to_db(db, user)
+
+    return CancelResponse(
+        order_id=order_id,
+        status="cancelled",
+        message="Order cancelled successfully",
     )

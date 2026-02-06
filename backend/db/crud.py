@@ -188,6 +188,22 @@ async def load_all_users(session: AsyncSession) -> list[User]:
     return users
 
 
+async def get_order_by_id(
+    session: AsyncSession, order_id: str
+) -> OrderModel | None:
+    result = await session.execute(
+        select(OrderModel).where(OrderModel.id == order_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def cancel_order_db(session: AsyncSession, order_id: str) -> None:
+    await session.execute(
+        update(OrderModel).where(OrderModel.id == order_id).values(status="cancelled")
+    )
+    await session.commit()
+
+
 async def sync_user_to_db(session: AsyncSession, user: User) -> None:
     """Sync in-memory user state back to DB."""
     await update_user_cash(session, str(user.user_id), user.cash)

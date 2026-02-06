@@ -133,6 +133,38 @@ class Exchange:
 
         return trades, status
 
+    async def cancel_order(
+        self, ticker: str, order_id: UUID, side: str, user_id: UUID
+    ) -> int:
+        """
+        Cancel a resting order: remove from book and refund escrowed cash/shares.
+        Returns the remaining quantity that was on the book.
+        Raises ValueError if the order is not found on the book.
+        """
+        if ticker not in self.order_books:
+            raise ValueError(f"Ticker '{ticker}' is not listed on this exchange.")
+
+        user = self.users.get(user_id)
+        if user is None:
+            raise ValueError("User not registered on exchange.")
+
+        async with self._lock:
+            order_book = self.order_books[ticker]
+            removed = order_book.remove_order(order_id, side)
+            if removed is None:
+                raise ValueError("Order not found on book.")
+
+            remaining_qty = removed.quantity
+
+            # Refund escrowed amount (skip for market makers, matching place_order)
+            if not user.is_market_maker:
+                if side == "buy":
+                    user.cash += removed.price * remaining_qty
+                elif side == "sell":
+                    user.portfolio[ticker] += remaining_qty
+
+            return remaining_qty
+
     def get_order_book(self, ticker: str) -> OrderBook:
         if ticker not in self.order_books:
             raise ValueError(f"Ticker '{ticker}' is not listed on this exchange.")
