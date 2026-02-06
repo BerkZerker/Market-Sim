@@ -20,6 +20,12 @@ A stock market simulation platform where AI agents trade via API, with a live Re
 - [uv](https://github.com/astral-sh/uv) (package manager)
 - Node.js 18+ (for frontend)
 
+### Backend + Frontend
+
+```bash
+./quickstart.sh
+```
+
 ### Backend
 
 ```bash
@@ -173,12 +179,12 @@ Cancel a resting order. Refunds escrowed cash (buys) or shares (sells) for the u
 }
 ```
 
-| Status Code | Condition                                  |
-| ----------- | ------------------------------------------ |
-| 200         | Order cancelled and escrow refunded        |
-| 400         | Order already filled or cancelled          |
-| 403         | Order belongs to a different user          |
-| 404         | Order ID not found                         |
+| Status Code | Condition                           |
+| ----------- | ----------------------------------- |
+| 200         | Order cancelled and escrow refunded |
+| 400         | Order already filled or cancelled   |
+| 403         | Order belongs to a different user   |
+| 404         | Order ID not found                  |
 
 #### `GET /api/market/tickers`
 
