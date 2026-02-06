@@ -99,6 +99,7 @@ async def record_order(
     quantity: int,
     filled_quantity: int,
     status: str,
+    time_in_force: str = "GTC",
 ) -> OrderModel:
     db_order = OrderModel(
         id=order_id,
@@ -109,6 +110,7 @@ async def record_order(
         quantity=quantity,
         filled_quantity=filled_quantity,
         status=status,
+        time_in_force=time_in_force,
     )
     session.add(db_order)
     await session.commit()
@@ -139,6 +141,41 @@ async def record_trade(
     session.add(db_trade)
     await session.commit()
     return db_trade
+
+
+async def get_user_trades(
+    session: AsyncSession,
+    user_id: str,
+    ticker: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TradeModel]:
+    from sqlalchemy import or_
+
+    stmt = select(TradeModel).where(
+        or_(TradeModel.buyer_id == user_id, TradeModel.seller_id == user_id)
+    )
+    if ticker is not None:
+        stmt = stmt.where(TradeModel.ticker == ticker)
+    stmt = stmt.order_by(TradeModel.created_at.desc()).limit(limit).offset(offset)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_trades_for_ticker(
+    session: AsyncSession,
+    ticker: str,
+    start=None,
+    end=None,
+) -> list[TradeModel]:
+    stmt = select(TradeModel).where(TradeModel.ticker == ticker)
+    if start is not None:
+        stmt = stmt.where(TradeModel.created_at >= start)
+    if end is not None:
+        stmt = stmt.where(TradeModel.created_at <= end)
+    stmt = stmt.order_by(TradeModel.created_at.asc())
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
 
 
 async def get_leaderboard(session: AsyncSession, limit: int = 50) -> list[dict]:
@@ -186,6 +223,25 @@ async def load_all_users(session: AsyncSession) -> list[User]:
         )
         users.append(user)
     return users
+
+
+async def get_open_orders(
+    session: AsyncSession,
+    user_id: str,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[OrderModel]:
+    result = await session.execute(
+        select(OrderModel)
+        .where(
+            OrderModel.user_id == user_id,
+            OrderModel.status.in_(["open", "partial"]),
+        )
+        .order_by(OrderModel.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    return list(result.scalars().all())
 
 
 async def get_order_by_id(

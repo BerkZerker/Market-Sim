@@ -12,13 +12,13 @@ async def get_portfolio(
     exchange: Exchange = Depends(get_exchange),
 ):
     holdings = []
-    total_value = user.cash
+    holdings_value = 0.0
 
     for ticker, qty in user.portfolio.items():
         if qty > 0:
             price = exchange.get_current_price(ticker) or 0.0
             value = price * qty
-            total_value += value
+            holdings_value += value
             holdings.append(
                 {
                     "ticker": ticker,
@@ -28,10 +28,19 @@ async def get_portfolio(
                 }
             )
 
+    # Compute escrowed cash from resting buy orders in the live order books
+    escrowed_cash = 0.0
+    for ticker, book in exchange.order_books.items():
+        for order in book.bids:
+            if order.user_id == user.user_id:
+                escrowed_cash += order.price * order.quantity
+
     return {
         "user_id": str(user.user_id),
         "username": user.username,
         "cash": round(user.cash, 2),
+        "buying_power": round(user.cash, 2),
+        "escrowed_cash": round(escrowed_cash, 2),
         "holdings": holdings,
-        "total_value": round(total_value, 2),
+        "total_value": round(user.cash + escrowed_cash + holdings_value, 2),
     }

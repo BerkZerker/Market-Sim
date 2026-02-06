@@ -11,9 +11,13 @@ class MatchingEngine:
     def __init__(self, order_book: OrderBook):
         self.order_book = order_book
 
-    def process_order(self, incoming_order: Order, side: str) -> list[Trade]:
+    def process_order(
+        self, incoming_order: Order, side: str, add_to_book: bool = True
+    ) -> list[Trade]:
         """
         Processes a new order and returns a list of trades that occurred.
+        When add_to_book=False, unfilled remainder is NOT added to the book
+        (used for IOC/FOK orders).
         """
 
         trades_made = []
@@ -47,7 +51,7 @@ class MatchingEngine:
                 if book_order.quantity == 0:
                     self.order_book.asks.pop(0)
 
-            if incoming_order.quantity > 0:
+            if incoming_order.quantity > 0 and add_to_book:
                 self.order_book.add_order(incoming_order, "buy")
 
         elif side == "sell":
@@ -78,7 +82,7 @@ class MatchingEngine:
                 if book_order.quantity == 0:
                     self.order_book.bids.pop(0)
 
-            if incoming_order.quantity > 0:
+            if incoming_order.quantity > 0 and add_to_book:
                 self.order_book.add_order(incoming_order, "sell")
 
         return trades_made

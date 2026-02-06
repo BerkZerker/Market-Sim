@@ -407,3 +407,117 @@ async def test_concurrent_orders_different_tickers(exchange, market_maker):
     assert len(trades2) == 1
     assert user.portfolio["TEST"] == 105
     assert user.portfolio["OTHER"] == 105
+
+
+# --- IOC (Immediate-or-Cancel) tests ---
+
+
+@pytest.mark.asyncio
+async def test_ioc_full_fill(exchange, buyer, market_maker):
+    """IOC order fully fills when enough liquidity exists."""
+    ask = Order(price=100.0, quantity=5, user_id=market_maker.user_id)
+    await exchange.place_order("TEST", ask, "sell")
+
+    initial_cash = buyer.cash
+    bid = Order(
+        price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="IOC"
+    )
+    trades, status = await exchange.place_order("TEST", bid, "buy")
+
+    assert status == "filled"
+    assert len(trades) == 1
+    assert buyer.portfolio["TEST"] == 5
+    assert buyer.cash == initial_cash - 500.0
+
+
+@pytest.mark.asyncio
+async def test_ioc_partial_fill(exchange, buyer, market_maker):
+    """IOC order partially fills; remainder is refunded, not placed on book."""
+    ask = Order(price=100.0, quantity=3, user_id=market_maker.user_id)
+    await exchange.place_order("TEST", ask, "sell")
+
+    initial_cash = buyer.cash
+    bid = Order(
+        price=100.0, quantity=10, user_id=buyer.user_id, time_in_force="IOC"
+    )
+    trades, status = await exchange.place_order("TEST", bid, "buy")
+
+    assert status == "filled"
+    assert len(trades) == 1
+    assert trades[0].quantity == 3
+    assert buyer.portfolio["TEST"] == 3
+    # Escrowed 1000, filled 300, refunded 700
+    assert buyer.cash == initial_cash - 300.0
+    # Nothing on the book
+    assert len(exchange.order_books["TEST"].bids) == 0
+
+
+@pytest.mark.asyncio
+async def test_ioc_no_fill(exchange, buyer):
+    """IOC with no liquidity results in cancellation and full refund."""
+    initial_cash = buyer.cash
+    bid = Order(
+        price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="IOC"
+    )
+    trades, status = await exchange.place_order("TEST", bid, "buy")
+
+    assert status == "cancelled"
+    assert len(trades) == 0
+    assert buyer.cash == initial_cash
+    assert len(exchange.order_books["TEST"].bids) == 0
+
+
+# --- FOK (Fill-or-Kill) tests ---
+
+
+@pytest.mark.asyncio
+async def test_fok_full_fill(exchange, buyer, market_maker):
+    """FOK order fully fills when exact or more liquidity exists."""
+    ask = Order(price=100.0, quantity=10, user_id=market_maker.user_id)
+    await exchange.place_order("TEST", ask, "sell")
+
+    initial_cash = buyer.cash
+    bid = Order(
+        price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="FOK"
+    )
+    trades, status = await exchange.place_order("TEST", bid, "buy")
+
+    assert status == "filled"
+    assert len(trades) == 1
+    assert trades[0].quantity == 5
+    assert buyer.portfolio["TEST"] == 5
+    assert buyer.cash == initial_cash - 500.0
+
+
+@pytest.mark.asyncio
+async def test_fok_rejected_insufficient_liquidity(exchange, buyer):
+    """FOK raises ValueError when not enough liquidity, no escrow deducted."""
+    initial_cash = buyer.cash
+    bid = Order(
+        price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="FOK"
+    )
+    with pytest.raises(ValueError, match="FOK order cannot be fully filled"):
+        await exchange.place_order("TEST", bid, "buy")
+
+    assert buyer.cash == initial_cash
+    assert len(exchange.order_books["TEST"].bids) == 0
+
+
+@pytest.mark.asyncio
+async def test_fok_exact_fill(exchange, buyer, market_maker):
+    """FOK exactly fills available liquidity."""
+    ask = Order(price=95.0, quantity=5, user_id=market_maker.user_id)
+    await exchange.place_order("TEST", ask, "sell")
+
+    initial_cash = buyer.cash
+    bid = Order(
+        price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="FOK"
+    )
+    trades, status = await exchange.place_order("TEST", bid, "buy")
+
+    assert status == "filled"
+    assert len(trades) == 1
+    assert trades[0].price == 95.0
+    assert buyer.portfolio["TEST"] == 5
+    # Price improvement: escrowed 500, paid 475, refund 25
+    assert buyer.cash == initial_cash - 475.0

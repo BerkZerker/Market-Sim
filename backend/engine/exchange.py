@@ -52,8 +52,29 @@ class Exchange:
         if user is None:
             raise ValueError("User not registered on exchange.")
 
+        tif = order.time_in_force
+
         async with self._locks[ticker]:
             original_qty = order.quantity
+            engine = self.matching_engines[ticker]
+
+            # FOK pre-check: verify enough liquidity exists before escrowing
+            if tif == "FOK":
+                available = 0
+                if side == "buy":
+                    for ask in self.order_books[ticker].asks:
+                        if ask.price <= order.price:
+                            available += ask.quantity
+                        else:
+                            break
+                elif side == "sell":
+                    for bid in self.order_books[ticker].bids:
+                        if bid.price >= order.price:
+                            available += bid.quantity
+                        else:
+                            break
+                if available < order.quantity:
+                    raise ValueError("FOK order cannot be fully filled")
 
             # Escrow: debit funds/shares upfront (skip for market makers)
             if not user.is_market_maker:
@@ -73,9 +94,9 @@ class Exchange:
                         )
                     user.portfolio[ticker] -= order.quantity
 
-            # Match
-            engine = self.matching_engines[ticker]
-            trades = engine.process_order(order, side)
+            # Match — only add remainder to book for GTC orders
+            add_to_book = tif == "GTC"
+            trades = engine.process_order(order, side, add_to_book=add_to_book)
 
             # Update last trade price
             if trades:
@@ -112,13 +133,26 @@ class Exchange:
                 if refund > 0:
                     user.cash += refund
 
+            # IOC: refund unfilled escrow since remainder is NOT on the book
+            if tif == "IOC" and remaining_qty > 0 and not user.is_market_maker:
+                if side == "buy":
+                    user.cash += order.price * remaining_qty
+                elif side == "sell":
+                    user.portfolio[ticker] += remaining_qty
+
             # Determine status
-            if filled_qty == original_qty:
+            if tif == "GTC":
+                if filled_qty == original_qty:
+                    status = "filled"
+                elif filled_qty > 0:
+                    status = "partial"
+                else:
+                    status = "open"
+            elif tif == "FOK":
+                # FOK always fully fills (rejected before matching otherwise)
                 status = "filled"
-            elif filled_qty > 0:
-                status = "partial"
-            else:
-                status = "open"
+            elif tif == "IOC":
+                status = "filled" if filled_qty > 0 else "cancelled"
 
         # Fire callback outside the lock
         if trades and self.on_trades:

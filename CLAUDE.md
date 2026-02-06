@@ -26,18 +26,21 @@ uv run python -m pytest
 
 ## API Endpoints
 
-| Method | Path                           | Auth | Purpose                        |
-| ------ | ------------------------------ | ---- | ------------------------------ |
-| POST   | /api/register                  | No   | Create account → api_key + jwt |
-| POST   | /api/login                     | No   | Login → jwt                    |
-| POST   | /api/orders                    | Yes  | Place limit order              |
-| DELETE | /api/orders/{id}               | Yes  | Cancel resting order           |
-| GET    | /api/market/tickers            | No   | All tickers + prices           |
-| GET    | /api/market/{ticker}           | No   | Ticker detail + depth          |
-| GET    | /api/market/{ticker}/orderbook | No   | Aggregated book                |
-| GET    | /api/portfolio                 | Yes  | User holdings + cash           |
-| GET    | /api/leaderboard               | No   | Top 50 by total value          |
-| GET    | /api/health                    | No   | Health check                   |
+| Method | Path                           | Auth | Purpose                                |
+| ------ | ------------------------------ | ---- | -------------------------------------- |
+| POST   | /api/register                  | No   | Create account → api_key + jwt         |
+| POST   | /api/login                     | No   | Login → jwt                            |
+| POST   | /api/orders                    | Yes  | Place order (GTC/IOC/FOK, rate-limited)|
+| DELETE | /api/orders/{id}               | Yes  | Cancel resting order (rate-limited)    |
+| GET    | /api/orders                    | Yes  | List open/partial orders               |
+| GET    | /api/trades                    | Yes  | Trade history (optional ticker filter) |
+| GET    | /api/market/tickers            | No   | All tickers + prices                   |
+| GET    | /api/market/{ticker}           | No   | Ticker detail + depth                  |
+| GET    | /api/market/{ticker}/orderbook | No   | Aggregated book                        |
+| GET    | /api/market/{ticker}/history   | No   | OHLCV candles (1m/5m/15m/1h/1d)       |
+| GET    | /api/portfolio                 | Yes  | Holdings + cash + buying_power         |
+| GET    | /api/leaderboard               | No   | Top 50 by total value                  |
+| GET    | /api/health                    | No   | Health check                           |
 | WS     | /ws/{channel}                  | No   | Real-time data                 |
 
 ## Workflow — READ BEFORE STARTING ANY TASK
@@ -88,12 +91,16 @@ Every change must pass these checks:
 
 7. **Per-ticker locks**: `Exchange` uses `defaultdict(asyncio.Lock)` — each ticker has its own lock. Orders on different tickers can process concurrently.
 
+8. **Time-in-force**: `Order.time_in_force` controls lifecycle: GTC (rests on book), IOC (fill what you can, refund rest), FOK (fill completely or reject pre-escrow). The `MatchingEngine.process_order()` `add_to_book` param controls whether unfilled remainder goes on the book.
+
+9. **Rate limiting**: `RateLimiter` in `api/rate_limit.py` — sliding window per user ID. Applied to `POST /api/orders` and `DELETE /api/orders/{id}`. Configurable via `config.settings.RATE_LIMIT_REQUESTS` and `RATE_LIMIT_WINDOW`.
+
 ## Testing
 
 - **Run tests**: `uv run python -m pytest` — bare `pytest` won't work (not installed globally)
 - `asyncio_mode = "auto"` (configured in `pyproject.toml`)
 - `pythonpath = ["backend"]` — imports resolve from `backend/`
-- 35 tests: 21 engine unit (`test_exchange.py`) + 14 API integration (`test_api.py`)
+- 57 tests: 27 engine unit (`test_exchange.py`) + 30 API integration (`test_api.py`)
 - `conftest.py` creates an in-memory SQLite DB + fresh Exchange per test
 
 ## Code Style
@@ -124,4 +131,4 @@ Do this as part of the task, not as a separate step.
 
 ## Known Issues (see ROADMAP.md)
 
-All Phase 1 issues are resolved. See ROADMAP.md for Phase 2+ items.
+Phases 1 and 2 are complete. See ROADMAP.md for Phase 3+ items.

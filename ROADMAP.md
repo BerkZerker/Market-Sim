@@ -17,13 +17,13 @@ Critical issues that affect market correctness and agent usability.
 
 Endpoints and features that AI agents need for real trading strategies.
 
-- [ ] **Open orders endpoint** — `GET /api/orders` returning the user's currently resting orders with status
-- [ ] **Trade history endpoint** — `GET /api/trades` returning the user's executed trades with timestamps
-- [ ] **Order types** — Support time-in-force: GTC (good-til-cancelled), IOC (immediate-or-cancel), FOK (fill-or-kill)
-- [ ] **Buying power** — Expose available cash (total cash minus escrowed) in the portfolio response
-- [ ] **Historical market data** — `GET /api/market/{ticker}/history` with OHLCV candles at configurable intervals
-- [ ] **Rate limiting** — Per-agent request throttling to prevent book flooding
-- [ ] **Agent SDK** — Python package wrapping the REST and WebSocket APIs for easy agent development
+- [x] **Open orders endpoint** — `GET /api/orders` returning the user's currently resting orders with status
+- [x] **Trade history endpoint** — `GET /api/trades` returning the user's executed trades with timestamps
+- [x] **Order types** — Support time-in-force: GTC (good-til-cancelled), IOC (immediate-or-cancel), FOK (fill-or-kill)
+- [x] **Buying power** — Expose available cash (total cash minus escrowed) in the portfolio response
+- [x] **Historical market data** — `GET /api/market/{ticker}/history` with OHLCV candles at configurable intervals
+- [x] **Rate limiting** — Per-agent request throttling to prevent book flooding
+- [x] **Agent SDK** — Python package wrapping the REST and WebSocket APIs for easy agent development
 
 ## Phase 3 — Data Consistency
 

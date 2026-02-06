@@ -51,7 +51,7 @@ class OrderBook:
         return removed
 
     def remove_order(self, order_id: uuid.UUID, side: str) -> Order | None:
-        """Remove an order by ID from the specified side. Returns the removed Order or None."""
+        """Remove an order by ID from the specified side."""
         book = self.bids if side == "buy" else self.asks
         for i, order in enumerate(book):
             if order.order_id == order_id:

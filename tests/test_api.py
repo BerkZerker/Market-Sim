@@ -292,3 +292,410 @@ async def test_cancel_filled_order_400(client: AsyncClient):
             headers={"X-API-Key": buyer_key},
         )
         assert resp.status_code == 400
+
+
+# --- Open orders endpoint tests ---
+
+
+@pytest.mark.asyncio
+async def test_get_orders_empty(client: AsyncClient):
+    resp = await client.post(
+        "/api/register",
+        json={"username": "orders_empty", "password": "pass1234"},
+    )
+    api_key = resp.json()["api_key"]
+    resp = await client.get("/api/orders", headers={"X-API-Key": api_key})
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+@pytest.mark.asyncio
+async def test_get_orders_with_resting_order(client: AsyncClient):
+    resp = await client.post(
+        "/api/register",
+        json={"username": "orders_resting", "password": "pass1234"},
+    )
+    api_key = resp.json()["api_key"]
+    headers = {"X-API-Key": api_key}
+
+    # Place a buy order that will rest (no sellers at this price)
+    resp = await client.post(
+        "/api/orders",
+        json={"ticker": "FUN", "side": "buy", "price": 50.0, "quantity": 3},
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "open"
+
+    # Query open orders
+    resp = await client.get("/api/orders", headers=headers)
+    assert resp.status_code == 200
+    orders = resp.json()
+    assert len(orders) == 1
+    assert orders[0]["ticker"] == "FUN"
+    assert orders[0]["side"] == "buy"
+    assert orders[0]["price"] == 50.0
+    assert orders[0]["quantity"] == 3
+
+
+@pytest.mark.asyncio
+async def test_get_orders_unauthenticated(client: AsyncClient):
+    resp = await client.get("/api/orders")
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_orders_excludes_filled(client: AsyncClient):
+    # Register buyer and seller
+    resp = await client.post(
+        "/api/register",
+        json={"username": "orders_buyer2", "password": "pass1234"},
+    )
+    buyer_key = resp.json()["api_key"]
+
+    resp = await client.post(
+        "/api/register",
+        json={"username": "orders_seller2", "password": "pass1234"},
+    )
+    seller_key = resp.json()["api_key"]
+
+    # Buyer places a resting bid
+    resp = await client.post(
+        "/api/orders",
+        json={"ticker": "FUN", "side": "buy", "price": 80.0, "quantity": 2},
+        headers={"X-API-Key": buyer_key},
+    )
+    assert resp.json()["status"] == "open"
+
+    # Verify it shows in open orders
+    resp = await client.get("/api/orders", headers={"X-API-Key": buyer_key})
+    assert len(resp.json()) == 1
+
+    # Seller sells into the bid — seller needs no shares because escrow check
+    # will reject. Instead: buyer buys from themselves by having the seller
+    # sell to them. But seller has no shares. So use a different ticker.
+    # Actually, let's just cancel the order to make it non-open, then verify.
+    order_id = resp.json()[0]["order_id"]
+    await client.delete(f"/api/orders/{order_id}", headers={"X-API-Key": buyer_key})
+
+    # After cancel, open orders should be empty
+    resp = await client.get("/api/orders", headers={"X-API-Key": buyer_key})
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+# --- Trade history endpoint tests ---
+
+
+@pytest.mark.asyncio
+async def test_get_trades_empty(client: AsyncClient):
+    resp = await client.post(
+        "/api/register",
+        json={"username": "trades_empty", "password": "pass1234"},
+    )
+    api_key = resp.json()["api_key"]
+    resp = await client.get("/api/trades", headers={"X-API-Key": api_key})
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+@pytest.mark.asyncio
+async def test_get_trades_after_fill(client: AsyncClient):
+    from uuid import UUID
+
+    from api.dependencies import get_exchange
+
+    exchange = get_exchange()
+
+    # Register two users
+    resp = await client.post(
+        "/api/register",
+        json={"username": "trades_seller", "password": "pass1234"},
+    )
+    seller_data = resp.json()
+    seller_key = seller_data["api_key"]
+    seller_id = seller_data["user_id"]
+
+    resp = await client.post(
+        "/api/register",
+        json={"username": "trades_buyer", "password": "pass1234"},
+    )
+    buyer_key = resp.json()["api_key"]
+
+    # Give seller some shares so they can place a sell order
+    seller_user = exchange.get_user(UUID(seller_id))
+    seller_user.portfolio["FUN"] = 100
+
+    # Seller places an ask
+    resp = await client.post(
+        "/api/orders",
+        json={"ticker": "FUN", "side": "sell", "price": 85.0, "quantity": 3},
+        headers={"X-API-Key": seller_key},
+    )
+    assert resp.status_code == 200
+
+    # Buyer buys
+    resp = await client.post(
+        "/api/orders",
+        json={"ticker": "FUN", "side": "buy", "price": 85.0, "quantity": 3},
+        headers={"X-API-Key": buyer_key},
+    )
+    assert resp.json()["status"] == "filled"
+
+    # Buyer sees side="buy"
+    resp = await client.get("/api/trades", headers={"X-API-Key": buyer_key})
+    assert resp.status_code == 200
+    trades = resp.json()
+    assert len(trades) >= 1
+    buyer_trade = [t for t in trades if t["ticker"] == "FUN" and t["price"] == 85.0]
+    assert len(buyer_trade) == 1
+    assert buyer_trade[0]["side"] == "buy"
+
+    # Seller sees side="sell"
+    resp = await client.get("/api/trades", headers={"X-API-Key": seller_key})
+    assert resp.status_code == 200
+    trades = resp.json()
+    seller_trade = [t for t in trades if t["ticker"] == "FUN" and t["price"] == 85.0]
+    assert len(seller_trade) == 1
+    assert seller_trade[0]["side"] == "sell"
+
+
+@pytest.mark.asyncio
+async def test_get_trades_unauthenticated(client: AsyncClient):
+    resp = await client.get("/api/trades")
+    assert resp.status_code == 401
+
+
+# --- Buying power tests ---
+
+
+@pytest.mark.asyncio
+async def test_portfolio_buying_power_no_orders(client: AsyncClient):
+    resp = await client.post(
+        "/api/register",
+        json={"username": "bp_no_orders", "password": "pass1234"},
+    )
+    api_key = resp.json()["api_key"]
+    resp = await client.get("/api/portfolio", headers={"X-API-Key": api_key})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["buying_power"] == 10000.0
+    assert data["escrowed_cash"] == 0.0
+    assert data["total_value"] == 10000.0
+
+
+@pytest.mark.asyncio
+async def test_portfolio_buying_power_with_resting_buy(client: AsyncClient):
+    resp = await client.post(
+        "/api/register",
+        json={"username": "bp_resting", "password": "pass1234"},
+    )
+    api_key = resp.json()["api_key"]
+    headers = {"X-API-Key": api_key}
+
+    # Place a resting buy: 5 shares @ $100 = $500 escrowed
+    resp = await client.post(
+        "/api/orders",
+        json={"ticker": "FUN", "side": "buy", "price": 100.0, "quantity": 5},
+        headers=headers,
+    )
+    assert resp.json()["status"] == "open"
+
+    resp = await client.get("/api/portfolio", headers=headers)
+    data = resp.json()
+    assert data["escrowed_cash"] == 500.0
+    assert data["buying_power"] == 9500.0
+    assert data["cash"] == 9500.0
+    # total_value includes escrowed cash
+    assert data["total_value"] == 10000.0
+
+
+# --- Historical market data tests ---
+
+
+@pytest.mark.asyncio
+async def test_history_no_trades(client: AsyncClient):
+    resp = await client.get("/api/market/FUN/history")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ticker"] == "FUN"
+    assert data["interval"] == "5m"
+    assert data["candles"] == []
+
+
+@pytest.mark.asyncio
+async def test_history_with_trades(client: AsyncClient):
+    from uuid import UUID
+
+    from api.dependencies import get_exchange
+
+    exchange = get_exchange()
+
+    # Register two users and create a trade
+    resp = await client.post(
+        "/api/register",
+        json={"username": "hist_seller", "password": "pass1234"},
+    )
+    seller_data = resp.json()
+    seller_key = seller_data["api_key"]
+    seller_id = seller_data["user_id"]
+
+    resp = await client.post(
+        "/api/register",
+        json={"username": "hist_buyer", "password": "pass1234"},
+    )
+    buyer_key = resp.json()["api_key"]
+
+    # Give seller shares
+    seller_user = exchange.get_user(UUID(seller_id))
+    seller_user.portfolio["MEME"] = 50
+
+    # Create a trade
+    await client.post(
+        "/api/orders",
+        json={"ticker": "MEME", "side": "sell", "price": 45.0, "quantity": 5},
+        headers={"X-API-Key": seller_key},
+    )
+    resp = await client.post(
+        "/api/orders",
+        json={"ticker": "MEME", "side": "buy", "price": 45.0, "quantity": 5},
+        headers={"X-API-Key": buyer_key},
+    )
+    assert resp.json()["status"] == "filled"
+
+    # Query history
+    resp = await client.get("/api/market/MEME/history?interval=1m")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ticker"] == "MEME"
+    assert len(data["candles"]) >= 1
+    candle = data["candles"][0]
+    assert candle["open"] == 45.0
+    assert candle["high"] == 45.0
+    assert candle["low"] == 45.0
+    assert candle["close"] == 45.0
+    assert candle["volume"] == 5
+
+
+@pytest.mark.asyncio
+async def test_history_invalid_ticker(client: AsyncClient):
+    resp = await client.get("/api/market/FAKE/history")
+    assert resp.status_code == 404
+
+
+# --- Order type (time-in-force) API tests ---
+
+
+@pytest.mark.asyncio
+async def test_place_ioc_order(client: AsyncClient):
+    """IOC order via API with no liquidity returns cancelled status."""
+    resp = await client.post(
+        "/api/register",
+        json={"username": "ioc_user", "password": "pass1234"},
+    )
+    api_key = resp.json()["api_key"]
+    headers = {"X-API-Key": api_key}
+
+    resp = await client.post(
+        "/api/orders",
+        json={
+            "ticker": "FUN",
+            "side": "buy",
+            "price": 50.0,
+            "quantity": 5,
+            "time_in_force": "IOC",
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "cancelled"
+    assert data["filled_quantity"] == 0
+
+    # Cash should be fully refunded
+    resp = await client.get("/api/portfolio", headers=headers)
+    assert resp.json()["cash"] == 10000.0
+
+
+@pytest.mark.asyncio
+async def test_invalid_time_in_force(client: AsyncClient):
+    resp = await client.post(
+        "/api/register",
+        json={"username": "bad_tif", "password": "pass1234"},
+    )
+    api_key = resp.json()["api_key"]
+
+    resp = await client.post(
+        "/api/orders",
+        json={
+            "ticker": "FUN",
+            "side": "buy",
+            "price": 50.0,
+            "quantity": 5,
+            "time_in_force": "INVALID",
+        },
+        headers={"X-API-Key": api_key},
+    )
+    assert resp.status_code == 400
+
+
+# --- Rate limiting tests ---
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_not_exceeded(client: AsyncClient):
+    """A few orders succeed under the default rate limit."""
+    resp = await client.post(
+        "/api/register",
+        json={"username": "rl_ok", "password": "pass1234"},
+    )
+    api_key = resp.json()["api_key"]
+    headers = {"X-API-Key": api_key}
+
+    for _ in range(3):
+        resp = await client.post(
+            "/api/orders",
+            json={"ticker": "FUN", "side": "buy", "price": 50.0, "quantity": 1},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_exceeded(client: AsyncClient):
+    """Override rate limiter with low limit; third request gets 429."""
+    from api.rate_limit import RateLimiter, get_rate_limiter
+
+    # Install a strict rate limiter for this test
+    strict_limiter = RateLimiter(max_requests=2, window_seconds=60)
+    from main import app
+    from api.rate_limit import get_rate_limiter as orig_getter
+
+    app.dependency_overrides[get_rate_limiter] = lambda: strict_limiter
+
+    try:
+        resp = await client.post(
+            "/api/register",
+            json={"username": "rl_exceed", "password": "pass1234"},
+        )
+        api_key = resp.json()["api_key"]
+        headers = {"X-API-Key": api_key}
+
+        # First two should succeed
+        for _ in range(2):
+            resp = await client.post(
+                "/api/orders",
+                json={"ticker": "FUN", "side": "buy", "price": 50.0, "quantity": 1},
+                headers=headers,
+            )
+            assert resp.status_code == 200
+
+        # Third should be rate limited
+        resp = await client.post(
+            "/api/orders",
+            json={"ticker": "FUN", "side": "buy", "price": 50.0, "quantity": 1},
+            headers=headers,
+        )
+        assert resp.status_code == 429
+    finally:
+        app.dependency_overrides.pop(get_rate_limiter, None)

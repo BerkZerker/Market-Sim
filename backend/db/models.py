@@ -63,6 +63,7 @@ class OrderModel(Base):
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     filled_quantity: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String, default="open")
+    time_in_force: Mapped[str] = mapped_column(String, default="GTC")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
 

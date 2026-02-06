@@ -1,8 +1,15 @@
-from api.dependencies import get_exchange
+from datetime import datetime, timedelta, timezone
+
+from api.dependencies import get_db, get_exchange
+from db.crud import get_trades_for_ticker
 from engine.exchange import Exchange
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/market", tags=["market"])
+
+VALID_INTERVALS = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86400}
 
 
 @router.get("/tickers")
@@ -63,3 +70,99 @@ async def get_orderbook(ticker: str, exchange: Exchange = Depends(get_exchange))
             for p, q in sorted(ask_levels.items())
         ],
     }
+
+
+class CandleResponse(BaseModel):
+    timestamp: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+
+
+class HistoryResponse(BaseModel):
+    ticker: str
+    interval: str
+    candles: list[CandleResponse]
+
+
+@router.get("/{ticker}/history", response_model=HistoryResponse)
+async def get_history(
+    ticker: str,
+    interval: str = Query(default="5m"),
+    start: datetime | None = Query(default=None),
+    end: datetime | None = Query(default=None),
+    exchange: Exchange = Depends(get_exchange),
+    db: AsyncSession = Depends(get_db),
+):
+    if ticker not in exchange.order_books:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ticker '{ticker}' not found",
+        )
+    if interval not in VALID_INTERVALS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid interval. Must be one of: "
+            f"{', '.join(VALID_INTERVALS)}",
+        )
+
+    now = datetime.now(timezone.utc)
+    if end is None:
+        end = now
+    if start is None:
+        start = end - timedelta(hours=24)
+
+    trades = await get_trades_for_ticker(db, ticker, start=start, end=end)
+
+    # Bucket trades into candles
+    interval_seconds = VALID_INTERVALS[interval]
+    candles: list[CandleResponse] = []
+    epoch = datetime(2020, 1, 1, tzinfo=timezone.utc)
+
+    def _ensure_tz(dt: datetime) -> datetime:
+        return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+    def _bucket_for(dt: datetime) -> datetime:
+        dt = _ensure_tz(dt)
+        s = (dt - epoch).total_seconds()
+        return epoch + timedelta(seconds=(s // interval_seconds) * interval_seconds)
+
+    if trades:
+        bucket_trades: list = []
+        bucket_start = _bucket_for(trades[0].created_at)
+
+        for trade in trades:
+            trade_bucket = _bucket_for(trade.created_at)
+            if trade_bucket != bucket_start:
+                # Flush previous bucket
+                if bucket_trades:
+                    candles.append(
+                        CandleResponse(
+                            timestamp=bucket_start.isoformat(),
+                            open=bucket_trades[0].price,
+                            high=max(t.price for t in bucket_trades),
+                            low=min(t.price for t in bucket_trades),
+                            close=bucket_trades[-1].price,
+                            volume=sum(t.quantity for t in bucket_trades),
+                        )
+                    )
+                bucket_start = trade_bucket
+                bucket_trades = []
+            bucket_trades.append(trade)
+
+        # Flush last bucket
+        if bucket_trades:
+            candles.append(
+                CandleResponse(
+                    timestamp=bucket_start.isoformat(),
+                    open=bucket_trades[0].price,
+                    high=max(t.price for t in bucket_trades),
+                    low=min(t.price for t in bucket_trades),
+                    close=bucket_trades[-1].price,
+                    volume=sum(t.quantity for t in bucket_trades),
+                )
+            )
+
+    return HistoryResponse(ticker=ticker, interval=interval, candles=candles)

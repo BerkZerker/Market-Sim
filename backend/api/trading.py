@@ -1,21 +1,28 @@
+from datetime import datetime
 from uuid import UUID
 
 from api.dependencies import get_current_user, get_db, get_exchange
+from api.rate_limit import RateLimiter, get_rate_limiter
 from core.order import Order
 from core.user import User
 from db.crud import (
     cancel_order_db,
+    get_open_orders,
     get_order_by_id,
+    get_user_trades,
     record_order,
     record_trade,
     sync_user_to_db,
 )
 from engine.exchange import Exchange
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api", tags=["trading"])
+
+
+VALID_TIF = {"GTC", "IOC", "FOK"}
 
 
 class OrderRequest(BaseModel):
@@ -23,6 +30,7 @@ class OrderRequest(BaseModel):
     side: str
     price: float
     quantity: int
+    time_in_force: str = "GTC"
 
 
 class TradeResponse(BaseModel):
@@ -51,7 +59,9 @@ async def place_order(
     user: User = Depends(get_current_user),
     exchange: Exchange = Depends(get_exchange),
     db: AsyncSession = Depends(get_db),
+    limiter: RateLimiter = Depends(get_rate_limiter),
 ):
+    limiter.check(user.user_id)
     if req.side not in ("buy", "sell"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -72,11 +82,17 @@ async def place_order(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Ticker '{req.ticker}' not found",
         )
+    if req.time_in_force not in VALID_TIF:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"time_in_force must be one of: {', '.join(sorted(VALID_TIF))}",
+        )
 
     order = Order(
         price=round(req.price, 2),
         quantity=req.quantity,
         user_id=user.user_id,
+        time_in_force=req.time_in_force,
     )
 
     try:
@@ -102,6 +118,7 @@ async def place_order(
         quantity=req.quantity,
         filled_quantity=filled_qty,
         status=order_status,
+        time_in_force=req.time_in_force,
     )
 
     for trade in trades:
@@ -164,7 +181,9 @@ async def cancel_order(
     user: User = Depends(get_current_user),
     exchange: Exchange = Depends(get_exchange),
     db: AsyncSession = Depends(get_db),
+    limiter: RateLimiter = Depends(get_rate_limiter),
 ):
+    limiter.check(user.user_id)
     # 1. Look up order in DB
     db_order = await get_order_by_id(db, order_id)
     if db_order is None:
@@ -212,3 +231,75 @@ async def cancel_order(
         status="cancelled",
         message="Order cancelled successfully",
     )
+
+
+class OpenOrderResponse(BaseModel):
+    order_id: str
+    ticker: str
+    side: str
+    price: float
+    quantity: int
+    filled_quantity: int
+    status: str
+    created_at: datetime
+
+
+@router.get("/orders", response_model=list[OpenOrderResponse])
+async def list_orders(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    orders = await get_open_orders(db, str(user.user_id), limit, offset)
+    return [
+        OpenOrderResponse(
+            order_id=o.id,
+            ticker=o.ticker,
+            side=o.side,
+            price=o.price,
+            quantity=o.quantity,
+            filled_quantity=o.filled_quantity,
+            status=o.status,
+            created_at=o.created_at,
+        )
+        for o in orders
+    ]
+
+
+class TradeHistoryResponse(BaseModel):
+    trade_id: str
+    ticker: str
+    price: float
+    quantity: int
+    side: str
+    counterparty_id: str
+    order_id: str
+    created_at: datetime
+
+
+@router.get("/trades", response_model=list[TradeHistoryResponse])
+async def list_trades(
+    ticker: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    trades = await get_user_trades(
+        db, str(user.user_id), ticker=ticker, limit=limit, offset=offset
+    )
+    uid = str(user.user_id)
+    return [
+        TradeHistoryResponse(
+            trade_id=t.id,
+            ticker=t.ticker,
+            price=t.price,
+            quantity=t.quantity,
+            side="buy" if t.buyer_id == uid else "sell",
+            counterparty_id=t.seller_id if t.buyer_id == uid else t.buyer_id,
+            order_id=t.buy_order_id if t.buyer_id == uid else t.sell_order_id,
+            created_at=t.created_at,
+        )
+        for t in trades
+    ]

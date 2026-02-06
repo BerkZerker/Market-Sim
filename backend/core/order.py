@@ -19,3 +19,4 @@ class Order:
     user_id: uuid.UUID = field(compare=False)
     timestamp: float = field(default_factory=time.time, compare=True)
     order_id: uuid.UUID = field(default_factory=uuid.uuid4, compare=False)
+    time_in_force: str = field(default="GTC", compare=False)

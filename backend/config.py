@@ -21,6 +21,8 @@ class Settings:
         }
     )
     STARTING_CASH: float = 10000.0
+    RATE_LIMIT_REQUESTS: int = 30
+    RATE_LIMIT_WINDOW: int = 60
 
 
 settings = Settings()
