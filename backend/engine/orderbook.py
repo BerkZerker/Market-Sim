@@ -26,9 +26,7 @@ class OrderBook:
             # If prices are equal, the older order (smaller timestamp) comes first.
             self.asks.sort(key=lambda o: (o.price, o.timestamp))
 
-    def remove_orders_by_user(
-        self, user_id: uuid.UUID
-    ) -> list[tuple[Order, str]]:
+    def remove_orders_by_user(self, user_id: uuid.UUID) -> list[tuple[Order, str]]:
         """Remove all orders belonging to user_id from both sides.
         Returns list of (order, side) tuples for escrow refund."""
         removed: list[tuple[Order, str]] = []

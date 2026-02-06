@@ -105,8 +105,7 @@ class ConnectionManager:
                     for p, q in sorted(bid_levels.items(), reverse=True)
                 ],
                 "asks": [
-                    {"price": p, "quantity": q}
-                    for p, q in sorted(ask_levels.items())
+                    {"price": p, "quantity": q} for p, q in sorted(ask_levels.items())
                 ],
             },
         )

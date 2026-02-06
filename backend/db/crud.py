@@ -35,9 +35,7 @@ async def get_user_by_username(
     return result.scalar_one_or_none()
 
 
-async def get_user_by_api_key(
-    session: AsyncSession, api_key: str
-) -> UserModel | None:
+async def get_user_by_api_key(session: AsyncSession, api_key: str) -> UserModel | None:
     result = await session.execute(
         select(UserModel).where(UserModel.api_key == api_key)
     )
@@ -45,24 +43,18 @@ async def get_user_by_api_key(
 
 
 async def get_user_by_id(session: AsyncSession, user_id: str) -> UserModel | None:
-    result = await session.execute(
-        select(UserModel).where(UserModel.id == user_id)
-    )
+    result = await session.execute(select(UserModel).where(UserModel.id == user_id))
     return result.scalar_one_or_none()
 
 
-async def update_user_cash(
-    session: AsyncSession, user_id: str, cash: float
-) -> None:
+async def update_user_cash(session: AsyncSession, user_id: str, cash: float) -> None:
     await session.execute(
         update(UserModel).where(UserModel.id == user_id).values(cash=cash)
     )
     await session.flush()
 
 
-async def get_holdings(
-    session: AsyncSession, user_id: str
-) -> list[PortfolioHolding]:
+async def get_holdings(session: AsyncSession, user_id: str) -> list[PortfolioHolding]:
     result = await session.execute(
         select(PortfolioHolding).where(PortfolioHolding.user_id == user_id)
     )
@@ -82,9 +74,7 @@ async def update_holding(
     if holding:
         holding.quantity = quantity
     else:
-        holding = PortfolioHolding(
-            user_id=user_id, ticker=ticker, quantity=quantity
-        )
+        holding = PortfolioHolding(user_id=user_id, ticker=ticker, quantity=quantity)
         session.add(holding)
     await session.flush()
 
@@ -246,12 +236,8 @@ async def get_open_orders(
     return list(result.scalars().all())
 
 
-async def get_order_by_id(
-    session: AsyncSession, order_id: str
-) -> OrderModel | None:
-    result = await session.execute(
-        select(OrderModel).where(OrderModel.id == order_id)
-    )
+async def get_order_by_id(session: AsyncSession, order_id: str) -> OrderModel | None:
+    result = await session.execute(select(OrderModel).where(OrderModel.id == order_id))
     return result.scalar_one_or_none()
 
 

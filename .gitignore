@@ -20,6 +20,9 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Environment
+.env
+
 # Database
 *.db
 

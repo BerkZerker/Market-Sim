@@ -49,9 +49,7 @@ class MarketMakerBot:
             return
 
         # Cancel stale orders before placing new ones
-        cancelled = await self.exchange.cancel_all_for_user(
-            ticker, self.user.user_id
-        )
+        cancelled = await self.exchange.cancel_all_for_user(ticker, self.user.user_id)
 
         spread = price * self.spread_pct
         bid_price = round(price - spread, 2)

@@ -65,10 +65,7 @@ async def get_orderbook(ticker: str, exchange: Exchange = Depends(get_exchange))
             {"price": p, "quantity": q}
             for p, q in sorted(bid_levels.items(), reverse=True)
         ],
-        "asks": [
-            {"price": p, "quantity": q}
-            for p, q in sorted(ask_levels.items())
-        ],
+        "asks": [{"price": p, "quantity": q} for p, q in sorted(ask_levels.items())],
     }
 
 
@@ -104,8 +101,7 @@ async def get_history(
     if interval not in VALID_INTERVALS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid interval. Must be one of: "
-            f"{', '.join(VALID_INTERVALS)}",
+            detail=f"Invalid interval. Must be one of: {', '.join(VALID_INTERVALS)}",
         )
 
     now = datetime.now(timezone.utc)

@@ -251,8 +251,8 @@ async def test_cancel_filled_order_400(client: AsyncClient):
         json={"ticker": "MEME", "side": "sell", "price": 50.0, "quantity": 5},
         headers={"X-API-Key": seller_key},
     )
-    # This may fail if seller has no shares — need to use a buy that gets filled instead
-    # Let's have the buyer place a buy, then the seller places a matching sell to fill it
+    # Seller has no shares — use a buy that gets filled instead.
+    # Buyer places a buy, seller places a matching sell to fill it.
     resp = await client.post(
         "/api/orders",
         json={"ticker": "FUN", "side": "buy", "price": 90.0, "quantity": 2},
@@ -357,7 +357,7 @@ async def test_get_orders_excludes_filled(client: AsyncClient):
         "/api/register",
         json={"username": "orders_seller2", "password": "pass1234"},
     )
-    seller_key = resp.json()["api_key"]
+    resp.json()["api_key"]  # seller registered
 
     # Buyer places a resting bid
     resp = await client.post(
@@ -669,7 +669,6 @@ async def test_rate_limit_exceeded(client: AsyncClient):
     # Install a strict rate limiter for this test
     strict_limiter = RateLimiter(max_requests=2, window_seconds=60)
     from main import app
-    from api.rate_limit import get_rate_limiter as orig_getter
 
     app.dependency_overrides[get_rate_limiter] = lambda: strict_limiter
 
@@ -847,13 +846,12 @@ async def test_place_order_atomic_consistency(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_market_maker_persists_orders(db_engine, db_session):
     """MarketMakerBot persists orders to DB when given a session factory."""
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
     from bots.market_maker import MarketMakerBot
     from config import settings
     from core.user import User
     from db.models import OrderModel
     from engine.exchange import Exchange
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     exchange = Exchange()
     for ticker, price in settings.TICKERS.items():

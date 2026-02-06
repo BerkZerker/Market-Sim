@@ -15,8 +15,10 @@ class MarketSimWS:
 
     def __init__(self, base_url: str):
         # Convert http(s) to ws(s)
-        self._ws_base = base_url.rstrip("/").replace("http://", "ws://").replace(
-            "https://", "wss://"
+        self._ws_base = (
+            base_url.rstrip("/")
+            .replace("http://", "ws://")
+            .replace("https://", "wss://")
         )
         self._callbacks: dict[str, list[Callable[[dict], Any]]] = {}
         self._connections: dict[str, Any] = {}

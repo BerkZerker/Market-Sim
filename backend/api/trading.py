@@ -97,9 +97,7 @@ async def place_order(
     )
 
     try:
-        trades, order_status = await exchange.place_order(
-            req.ticker, order, req.side
-        )
+        trades, order_status = await exchange.place_order(req.ticker, order, req.side)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

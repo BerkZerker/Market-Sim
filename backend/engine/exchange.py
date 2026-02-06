@@ -125,9 +125,7 @@ class Exchange:
                 # since those shares are still resting on the book.
                 total_escrowed_for_filled = order.price * filled_qty
                 total_cost = sum(
-                    t.price * t.quantity
-                    for t in trades
-                    if t.buyer_id == order.user_id
+                    t.price * t.quantity for t in trades if t.buyer_id == order.user_id
                 )
                 refund = total_escrowed_for_filled - total_cost
                 if refund > 0:

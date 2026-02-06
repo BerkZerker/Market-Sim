@@ -25,9 +25,7 @@ class MarketSimClient:
         self._session.headers["X-API-Key"] = api_key
 
     @classmethod
-    def register(
-        cls, base_url: str, username: str, password: str
-    ) -> "MarketSimClient":
+    def register(cls, base_url: str, username: str, password: str) -> "MarketSimClient":
         """Register a new user and return an authenticated client."""
         resp = requests.post(
             f"{base_url.rstrip('/')}/api/register",
@@ -136,9 +134,7 @@ class MarketSimClient:
             message=data["message"],
         )
 
-    def get_orders(
-        self, limit: int = 50, offset: int = 0
-    ) -> list[OpenOrder]:
+    def get_orders(self, limit: int = 50, offset: int = 0) -> list[OpenOrder]:
         data = self._get("/api/orders", limit=limit, offset=offset)
         return [
             OpenOrder(

@@ -2,10 +2,9 @@ import asyncio
 from collections.abc import AsyncGenerator
 
 import pytest
+from db.models import Base
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
-from db.models import Base
 
 
 @pytest.fixture(scope="session")
@@ -36,12 +35,11 @@ async def db_session(db_engine) -> AsyncGenerator[AsyncSession, None]:
 @pytest.fixture
 async def client(db_engine) -> AsyncGenerator[AsyncClient, None]:
     """Create a test client with a properly initialized exchange."""
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
     from api.dependencies import set_exchange
     from config import settings
     from db import database as db_module
     from engine.exchange import Exchange
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     # Override the database to use in-memory SQLite
     test_session_factory = async_sessionmaker(

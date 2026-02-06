@@ -71,7 +71,9 @@ def main():
         )
         if resp.ok:
             result = resp.json()
-            print(f"  Status: {result['status']}, Filled: {result['filled_quantity']}/{result['quantity']}")
+            filled = result["filled_quantity"]
+            qty = result["quantity"]
+            print(f"  Status: {result['status']}, Filled: {filled}/{qty}")
             for trade in result["trades"]:
                 print(f"  Trade: {trade['quantity']} @ ${trade['price']:.2f}")
         else:

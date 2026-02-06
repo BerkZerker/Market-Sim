@@ -2,7 +2,6 @@ import asyncio
 import uuid
 
 import pytest
-
 from core.order import Order
 from core.user import User
 from engine.exchange import Exchange
@@ -185,7 +184,9 @@ async def test_cancel_buy_order(exchange, buyer):
     assert buyer.cash == initial_cash - 500.0
 
     # Cancel — cash should be restored
-    remaining = await exchange.cancel_order("TEST", order.order_id, "buy", buyer.user_id)
+    remaining = await exchange.cancel_order(
+        "TEST", order.order_id, "buy", buyer.user_id
+    )
     assert remaining == 5
     assert buyer.cash == initial_cash
     assert len(exchange.order_books["TEST"].bids) == 0
@@ -200,7 +201,9 @@ async def test_cancel_sell_order(exchange, seller):
     assert seller.portfolio["TEST"] == initial_shares - 10
 
     # Cancel — shares should be restored
-    remaining = await exchange.cancel_order("TEST", order.order_id, "sell", seller.user_id)
+    remaining = await exchange.cancel_order(
+        "TEST", order.order_id, "sell", seller.user_id
+    )
     assert remaining == 10
     assert seller.portfolio["TEST"] == initial_shares
     assert len(exchange.order_books["TEST"].asks) == 0
@@ -419,9 +422,7 @@ async def test_ioc_full_fill(exchange, buyer, market_maker):
     await exchange.place_order("TEST", ask, "sell")
 
     initial_cash = buyer.cash
-    bid = Order(
-        price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="IOC"
-    )
+    bid = Order(price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="IOC")
     trades, status = await exchange.place_order("TEST", bid, "buy")
 
     assert status == "filled"
@@ -437,9 +438,7 @@ async def test_ioc_partial_fill(exchange, buyer, market_maker):
     await exchange.place_order("TEST", ask, "sell")
 
     initial_cash = buyer.cash
-    bid = Order(
-        price=100.0, quantity=10, user_id=buyer.user_id, time_in_force="IOC"
-    )
+    bid = Order(price=100.0, quantity=10, user_id=buyer.user_id, time_in_force="IOC")
     trades, status = await exchange.place_order("TEST", bid, "buy")
 
     assert status == "filled"
@@ -456,9 +455,7 @@ async def test_ioc_partial_fill(exchange, buyer, market_maker):
 async def test_ioc_no_fill(exchange, buyer):
     """IOC with no liquidity results in cancellation and full refund."""
     initial_cash = buyer.cash
-    bid = Order(
-        price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="IOC"
-    )
+    bid = Order(price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="IOC")
     trades, status = await exchange.place_order("TEST", bid, "buy")
 
     assert status == "cancelled"
@@ -477,9 +474,7 @@ async def test_fok_full_fill(exchange, buyer, market_maker):
     await exchange.place_order("TEST", ask, "sell")
 
     initial_cash = buyer.cash
-    bid = Order(
-        price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="FOK"
-    )
+    bid = Order(price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="FOK")
     trades, status = await exchange.place_order("TEST", bid, "buy")
 
     assert status == "filled"
@@ -493,9 +488,7 @@ async def test_fok_full_fill(exchange, buyer, market_maker):
 async def test_fok_rejected_insufficient_liquidity(exchange, buyer):
     """FOK raises ValueError when not enough liquidity, no escrow deducted."""
     initial_cash = buyer.cash
-    bid = Order(
-        price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="FOK"
-    )
+    bid = Order(price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="FOK")
     with pytest.raises(ValueError, match="FOK order cannot be fully filled"):
         await exchange.place_order("TEST", bid, "buy")
 
@@ -510,9 +503,7 @@ async def test_fok_exact_fill(exchange, buyer, market_maker):
     await exchange.place_order("TEST", ask, "sell")
 
     initial_cash = buyer.cash
-    bid = Order(
-        price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="FOK"
-    )
+    bid = Order(price=100.0, quantity=5, user_id=buyer.user_id, time_in_force="FOK")
     trades, status = await exchange.place_order("TEST", bid, "buy")
 
     assert status == "filled"
