@@ -7,11 +7,11 @@ Planned features and improvements for Market Sim, organized by priority.
 Critical issues that affect market correctness and agent usability.
 
 - [x] **Order cancellation** — `DELETE /api/orders/{order_id}` endpoint that refunds escrowed cash/shares and removes the order from the book
-- [ ] **Market maker cleanup** — Cancel stale orders before placing new ones each cycle, preventing unbounded order book growth
-- [ ] **Fix partial fill settlement** — Refund escrow difference for partially filled buy orders (currently only refunds fully filled orders)
-- [ ] **Fix sell-side price improvement** — Settle price improvement refunds for sell orders (currently stubbed with `pass`)
-- [ ] **Persist JWT secret** — Load `JWT_SECRET` from environment variable so tokens survive server restarts
-- [ ] **Per-ticker locks** — Replace the single global `asyncio.Lock` with per-ticker locks for concurrent order processing
+- [x] **Market maker cleanup** — Cancel stale orders before placing new ones each cycle, preventing unbounded order book growth
+- [x] **Fix partial fill settlement** — Refund escrow difference for partially filled buy orders (currently only refunds fully filled orders)
+- [x] **Fix sell-side price improvement** — Settle price improvement refunds for sell orders (currently stubbed with `pass`)
+- [x] **Persist JWT secret** — Load `JWT_SECRET` from environment variable so tokens survive server restarts
+- [x] **Per-ticker locks** — Replace the single global `asyncio.Lock` with per-ticker locks for concurrent order processing
 
 ## Phase 2 — Agent API
 

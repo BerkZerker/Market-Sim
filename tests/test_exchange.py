@@ -234,3 +234,176 @@ async def test_cancel_partial_order(exchange, buyer, market_maker):
 async def test_cancel_nonexistent_order(exchange, buyer):
     with pytest.raises(ValueError, match="Order not found"):
         await exchange.cancel_order("TEST", uuid.uuid4(), "buy", buyer.user_id)
+
+
+# --- Price improvement refund tests ---
+
+
+@pytest.mark.asyncio
+async def test_partial_fill_price_improvement_refund(exchange, buyer, market_maker):
+    """Partial fill at a better price should refund the price difference immediately."""
+    # MM posts ask at 95
+    ask = Order(price=95.0, quantity=3, user_id=market_maker.user_id)
+    await exchange.place_order("TEST", ask, "sell")
+
+    # Buyer bids 100 for 10 — gets 3 filled at 95, 7 resting
+    initial_cash = buyer.cash
+    bid = Order(price=100.0, quantity=10, user_id=buyer.user_id)
+    trades, status = await exchange.place_order("TEST", bid, "buy")
+
+    assert status == "partial"
+    assert len(trades) == 1
+    assert trades[0].price == 95.0
+    assert trades[0].quantity == 3
+
+    # Escrowed: 10 * 100 = 1000
+    # Filled cost: 3 * 95 = 285
+    # Refund on filled portion: 3 * 100 - 285 = 15
+    # Remaining escrow: 7 * 100 = 700 (still on book)
+    # Cash = 10000 - 1000 + 15 = 9015
+    assert buyer.cash == initial_cash - 1000.0 + 15.0
+    assert buyer.portfolio["TEST"] == 3
+
+
+@pytest.mark.asyncio
+async def test_full_fill_price_improvement_refund(exchange, buyer, market_maker):
+    """Full fill at a better price should refund the price difference (regression)."""
+    # MM posts ask at 90
+    ask = Order(price=90.0, quantity=5, user_id=market_maker.user_id)
+    await exchange.place_order("TEST", ask, "sell")
+
+    # Buyer bids 100 for 5 — fully filled at 90
+    initial_cash = buyer.cash
+    bid = Order(price=100.0, quantity=5, user_id=buyer.user_id)
+    trades, status = await exchange.place_order("TEST", bid, "buy")
+
+    assert status == "filled"
+    assert trades[0].price == 90.0
+
+    # Escrowed: 5 * 100 = 500, cost: 5 * 90 = 450, refund: 50
+    assert buyer.cash == initial_cash - 450.0
+    assert buyer.portfolio["TEST"] == 5
+
+
+@pytest.mark.asyncio
+async def test_sell_sweeps_multiple_bid_levels(exchange, seller, market_maker):
+    """Incoming sell matches multiple resting bids at different prices."""
+    # MM places two bids at different prices
+    bid1 = Order(price=105.0, quantity=5, user_id=market_maker.user_id)
+    await exchange.place_order("TEST", bid1, "buy")
+    bid2 = Order(price=100.0, quantity=5, user_id=market_maker.user_id)
+    await exchange.place_order("TEST", bid2, "buy")
+
+    # Seller sells 8 at 99 — sweeps 5@105 + 3@100
+    initial_cash = seller.cash
+    initial_shares = seller.portfolio["TEST"]
+    ask = Order(price=99.0, quantity=8, user_id=seller.user_id)
+    trades, status = await exchange.place_order("TEST", ask, "sell")
+
+    assert status == "filled"
+    assert len(trades) == 2
+    assert trades[0].price == 105.0
+    assert trades[0].quantity == 5
+    assert trades[1].price == 100.0
+    assert trades[1].quantity == 3
+
+    # Seller escrowed 8 shares, received 5*105 + 3*100 = 825
+    assert seller.portfolio["TEST"] == initial_shares - 8
+    assert seller.cash == initial_cash + 825.0
+
+
+# --- Cancel all for user tests ---
+
+
+@pytest.mark.asyncio
+async def test_cancel_all_for_user(exchange, market_maker):
+    """cancel_all_for_user removes all orders from the book."""
+    bid = Order(price=99.0, quantity=10, user_id=market_maker.user_id)
+    await exchange.place_order("TEST", bid, "buy")
+    ask = Order(price=101.0, quantity=10, user_id=market_maker.user_id)
+    await exchange.place_order("TEST", ask, "sell")
+
+    book = exchange.order_books["TEST"]
+    assert len(book.bids) == 1
+    assert len(book.asks) == 1
+
+    removed = await exchange.cancel_all_for_user("TEST", market_maker.user_id)
+    assert len(removed) == 2
+    assert len(book.bids) == 0
+    assert len(book.asks) == 0
+
+
+@pytest.mark.asyncio
+async def test_cancel_all_preserves_other_users(exchange, buyer, market_maker):
+    """cancel_all_for_user only removes the target user's orders."""
+    mm_bid = Order(price=99.0, quantity=10, user_id=market_maker.user_id)
+    await exchange.place_order("TEST", mm_bid, "buy")
+    buyer_bid = Order(price=98.0, quantity=5, user_id=buyer.user_id)
+    await exchange.place_order("TEST", buyer_bid, "buy")
+
+    book = exchange.order_books["TEST"]
+    assert len(book.bids) == 2
+
+    await exchange.cancel_all_for_user("TEST", market_maker.user_id)
+    assert len(book.bids) == 1
+    assert book.bids[0].user_id == buyer.user_id
+
+
+@pytest.mark.asyncio
+async def test_cancel_all_refunds_non_market_maker(exchange, buyer, seller):
+    """cancel_all_for_user refunds escrowed cash/shares for regular users."""
+    initial_cash = buyer.cash
+    initial_shares = seller.portfolio["TEST"]
+
+    bid = Order(price=100.0, quantity=5, user_id=buyer.user_id)
+    await exchange.place_order("TEST", bid, "buy")
+    assert buyer.cash == initial_cash - 500.0
+
+    ask = Order(price=110.0, quantity=10, user_id=seller.user_id)
+    await exchange.place_order("TEST", ask, "sell")
+    assert seller.portfolio["TEST"] == initial_shares - 10
+
+    await exchange.cancel_all_for_user("TEST", buyer.user_id)
+    assert buyer.cash == initial_cash  # cash refunded
+
+    await exchange.cancel_all_for_user("TEST", seller.user_id)
+    assert seller.portfolio["TEST"] == initial_shares  # shares refunded
+
+
+# --- Per-ticker lock tests ---
+
+
+@pytest.mark.asyncio
+async def test_concurrent_orders_different_tickers(exchange, market_maker):
+    """Orders on different tickers can process concurrently with per-ticker locks."""
+    exchange.add_ticker("OTHER", initial_price=50.0)
+
+    user = User(user_id=uuid.uuid4(), username="trader", cash=100000.0)
+    user.portfolio["TEST"] = 100
+    user.portfolio["OTHER"] = 100
+    exchange.register_user(user)
+
+    # MM provides asks on both tickers
+    ask1 = Order(price=100.0, quantity=10, user_id=market_maker.user_id)
+    await exchange.place_order("TEST", ask1, "sell")
+    ask2 = Order(price=50.0, quantity=10, user_id=market_maker.user_id)
+    await exchange.place_order("OTHER", ask2, "sell")
+
+    # Place buys on both tickers concurrently
+    bid1 = Order(price=100.0, quantity=5, user_id=user.user_id)
+    bid2 = Order(price=50.0, quantity=5, user_id=user.user_id)
+
+    results = await asyncio.gather(
+        exchange.place_order("TEST", bid1, "buy"),
+        exchange.place_order("OTHER", bid2, "buy"),
+    )
+
+    trades1, status1 = results[0]
+    trades2, status2 = results[1]
+
+    assert status1 == "filled"
+    assert status2 == "filled"
+    assert len(trades1) == 1
+    assert len(trades2) == 1
+    assert user.portfolio["TEST"] == 105
+    assert user.portfolio["OTHER"] == 105

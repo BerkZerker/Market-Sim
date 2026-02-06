@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 from collections.abc import Callable
 from uuid import UUID
 
@@ -20,7 +21,7 @@ class Exchange:
         self.matching_engines: dict[str, MatchingEngine] = {}
         self.last_trades: dict[str, float] = {}
         self.users: dict[UUID, User] = {}
-        self._lock = asyncio.Lock()
+        self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self.on_trades: Callable[[str, list[Trade]], None] | None = None
 
     def add_ticker(self, ticker: str, initial_price: float | None = None):
@@ -51,7 +52,7 @@ class Exchange:
         if user is None:
             raise ValueError("User not registered on exchange.")
 
-        async with self._lock:
+        async with self._locks[ticker]:
             original_qty = order.quantity
 
             # Escrow: debit funds/shares upfront (skip for market makers)
@@ -81,24 +82,15 @@ class Exchange:
                 self.last_trades[ticker] = trades[-1].price
 
             # Settle trades: credit the other side
+            # Resting orders always trade at their own escrowed price
+            # (matching engine uses book_order.price), so no price
+            # improvement refund is needed for the resting side.
+            # The incoming side's refund is handled after the loop.
             for trade in trades:
                 buyer = self.users.get(trade.buyer_id)
                 seller = self.users.get(trade.seller_id)
-
-                if buyer and buyer.user_id != order.user_id:
-                    # Buyer was on the book — deduct escrowed at book price,
-                    # but trade may execute at a different price for partial
-                    # Actually buyer already escrowed at their order price;
-                    # trade price may be lower. Refund difference handled below.
-                    pass
-
-                if seller and seller.user_id != order.user_id:
-                    pass
-
-                # Credit buyer's shares
                 if buyer:
                     buyer.portfolio[ticker] += trade.quantity
-                # Credit seller's cash
                 if seller:
                     seller.cash += trade.price * trade.quantity
 
@@ -106,16 +98,17 @@ class Exchange:
             remaining_qty = order.quantity  # after matching, this is unfilled qty
             filled_qty = original_qty - remaining_qty
 
-            if not user.is_market_maker and remaining_qty == 0 and side == "buy":
-                # Fully filled — refund difference between escrowed price and
-                # actual execution prices
-                total_escrowed = order.price * original_qty
+            if not user.is_market_maker and side == "buy" and filled_qty > 0:
+                # Refund price improvement on the filled portion.
+                # Unfilled escrow (remaining_qty * price) stays deducted
+                # since those shares are still resting on the book.
+                total_escrowed_for_filled = order.price * filled_qty
                 total_cost = sum(
                     t.price * t.quantity
                     for t in trades
                     if t.buyer_id == order.user_id
                 )
-                refund = total_escrowed - total_cost
+                refund = total_escrowed_for_filled - total_cost
                 if refund > 0:
                     user.cash += refund
 
@@ -148,7 +141,7 @@ class Exchange:
         if user is None:
             raise ValueError("User not registered on exchange.")
 
-        async with self._lock:
+        async with self._locks[ticker]:
             order_book = self.order_books[ticker]
             removed = order_book.remove_order(order_id, side)
             if removed is None:
@@ -164,6 +157,32 @@ class Exchange:
                     user.portfolio[ticker] += remaining_qty
 
             return remaining_qty
+
+    async def cancel_all_for_user(
+        self, ticker: str, user_id: UUID
+    ) -> list[tuple["Order", str]]:
+        """Cancel all resting orders for a user on a ticker.
+        Refunds escrowed cash/shares for non-market-maker users.
+        Returns list of (order, side) removed."""
+        if ticker not in self.order_books:
+            raise ValueError(f"Ticker '{ticker}' is not listed on this exchange.")
+
+        user = self.users.get(user_id)
+        if user is None:
+            raise ValueError("User not registered on exchange.")
+
+        async with self._locks[ticker]:
+            order_book = self.order_books[ticker]
+            removed = order_book.remove_orders_by_user(user_id)
+
+            if not user.is_market_maker:
+                for order, side in removed:
+                    if side == "buy":
+                        user.cash += order.price * order.quantity
+                    elif side == "sell":
+                        user.portfolio[ticker] += order.quantity
+
+            return removed
 
     def get_order_book(self, ticker: str) -> OrderBook:
         if ticker not in self.order_books:

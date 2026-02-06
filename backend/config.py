@@ -1,3 +1,4 @@
+import os
 import secrets
 from dataclasses import dataclass, field
 
@@ -5,7 +6,9 @@ from dataclasses import dataclass, field
 @dataclass
 class Settings:
     DATABASE_URL: str = "sqlite+aiosqlite:///./market.db"
-    JWT_SECRET: str = field(default_factory=lambda: secrets.token_hex(32))
+    JWT_SECRET: str = field(
+        default_factory=lambda: os.environ.get("JWT_SECRET", secrets.token_hex(32))
+    )
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 24
     TICKERS: dict[str, float] = field(
