@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getPortfolio } from "../api/client";
+import Spinner from "../components/Spinner";
 import { useStore } from "../stores/useStore";
 
 export default function Portfolio() {
   const { username, cash, holdings, totalValue } = useStore((s) => s.user);
   const setPortfolio = useStore((s) => s.setPortfolio);
+  const addNotification = useStore((s) => s.addNotification);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
 
@@ -19,11 +21,19 @@ export default function Portfolio() {
         setPortfolio(data.cash, data.holdings, data.total_value);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
-  }, [username, navigate, setPortfolio]);
+      .catch((err) => {
+        addNotification(err.message || "Failed to load portfolio", "error");
+        setLoading(false);
+      });
+  }, [username, navigate, setPortfolio, addNotification]);
 
   if (!username) return null;
-  if (loading) return <p className="text-gray-500">Loading...</p>;
+  if (loading)
+    return (
+      <div className="flex justify-center py-12">
+        <Spinner size="lg" />
+      </div>
+    );
 
   return (
     <div>

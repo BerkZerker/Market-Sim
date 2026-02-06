@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { getLeaderboard } from "../api/client";
+import Spinner from "../components/Spinner";
+import { useStore } from "../stores/useStore";
 
 interface Entry {
   user_id: string;
@@ -11,6 +13,7 @@ interface Entry {
 export default function Leaderboard() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
+  const addNotification = useStore((s) => s.addNotification);
 
   const fetchLeaderboard = () => {
     getLeaderboard()
@@ -18,7 +21,10 @@ export default function Leaderboard() {
         setEntries(data.leaderboard);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        addNotification(err.message || "Failed to load leaderboard", "error");
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -32,7 +38,9 @@ export default function Leaderboard() {
       <h1 className="text-2xl font-bold mb-6">Leaderboard</h1>
 
       {loading ? (
-        <p className="text-gray-500">Loading...</p>
+        <div className="flex justify-center py-12">
+          <Spinner size="lg" />
+        </div>
       ) : entries.length === 0 ? (
         <p className="text-gray-500">No players yet. Be the first to register!</p>
       ) : (

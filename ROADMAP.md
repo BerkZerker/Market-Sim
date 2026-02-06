@@ -40,14 +40,16 @@ Hardening the relationship between in-memory state and the database.
 
 UI/UX improvements for the dashboard.
 
-- [ ] **Loading states** — Spinners and skeleton screens for async data fetches
-- [ ] **Error boundaries** — React error boundaries to prevent full-app crashes on component errors
-- [ ] **Error feedback** — Surface API errors to the user instead of silently swallowing them
-- [ ] **Mobile navigation** — Hamburger menu for small screens
-- [ ] **Active route indicator** — Highlight current page in the navbar
+- [x] **Loading states** — Spinners and skeleton screens for async data fetches
+- [x] **Error boundaries** — React error boundaries to prevent full-app crashes on component errors
+- [x] **Error feedback** — Surface API errors to the user instead of silently swallowing them
+- [x] **Mobile navigation** — Hamburger menu for small screens
+- [x] **Active route indicator** — Highlight current page in the navbar
 - [ ] **Order history page** — View past orders and trades for the logged-in user
-- [ ] **Connection status** — Visual indicator showing WebSocket connection health
+- [x] **Connection status** — Visual indicator showing WebSocket connection health
 - [ ] **Bid-ask spread display** — Show spread and midpoint on the order book view
+- [ ] **Price charts** — Candlestick charts for each ticker using historical data endpoint
+- [ ] **Dark mode** — Optional dark theme / light theme toggle, switch to a neutral color palette for better accessibility (no blue undertones).
 
 ## Phase 5 — Infrastructure
 

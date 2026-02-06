@@ -43,10 +43,18 @@ interface OrderBookState {
   asks: OrderBookLevel[];
 }
 
+interface Notification {
+  id: string;
+  message: string;
+  type: "error" | "success" | "info";
+}
+
 interface AppState {
   user: UserState;
   market: MarketState;
   orderbook: OrderBookState;
+  notifications: Notification[];
+  wsConnected: boolean;
 
   setUser: (user: Partial<UserState>) => void;
   logout: () => void;
@@ -54,9 +62,12 @@ interface AppState {
   addPricePoint: (ticker: string, price: number) => void;
   setOrderbook: (bids: OrderBookLevel[], asks: OrderBookLevel[]) => void;
   setPortfolio: (cash: number, holdings: Holding[], totalValue: number) => void;
+  addNotification: (message: string, type: Notification["type"]) => void;
+  removeNotification: (id: string) => void;
+  setWsConnected: (connected: boolean) => void;
 }
 
-export const useStore = create<AppState>((set) => ({
+export const useStore = create<AppState>((set, get) => ({
   user: {
     userId: localStorage.getItem("user_id"),
     username: localStorage.getItem("username"),
@@ -74,6 +85,8 @@ export const useStore = create<AppState>((set) => ({
     bids: [],
     asks: [],
   },
+  notifications: [],
+  wsConnected: false,
 
   setUser: (userData) =>
     set((state) => {
@@ -126,4 +139,19 @@ export const useStore = create<AppState>((set) => ({
     set((state) => ({
       user: { ...state.user, cash, holdings, totalValue },
     })),
+
+  addNotification: (message, type) => {
+    const id = Date.now().toString();
+    set((state) => ({
+      notifications: [...state.notifications.slice(-4), { id, message, type }],
+    }));
+    setTimeout(() => get().removeNotification(id), 5000);
+  },
+
+  removeNotification: (id) =>
+    set((state) => ({
+      notifications: state.notifications.filter((n) => n.id !== id),
+    })),
+
+  setWsConnected: (connected) => set({ wsConnected: connected }),
 }));
