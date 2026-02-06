@@ -11,8 +11,8 @@ uv run uvicorn backend.main:app --reload
 # Frontend
 cd frontend && npm run dev
 
-# Tests
-pytest
+# Tests (pytest is not installed globally — always use uv run)
+uv run python -m pytest
 ```
 
 ## Architecture
@@ -26,19 +26,51 @@ pytest
 
 ## API Endpoints
 
-| Method | Path | Auth | Purpose |
-|--------|------|------|---------|
-| POST | /api/register | No | Create account → api_key + jwt |
-| POST | /api/login | No | Login → jwt |
-| POST | /api/orders | Yes | Place limit order |
-| DELETE | /api/orders/{id} | Yes | Cancel resting order |
-| GET | /api/market/tickers | No | All tickers + prices |
-| GET | /api/market/{ticker} | No | Ticker detail + depth |
-| GET | /api/market/{ticker}/orderbook | No | Aggregated book |
-| GET | /api/portfolio | Yes | User holdings + cash |
-| GET | /api/leaderboard | No | Top 50 by total value |
-| GET | /api/health | No | Health check |
-| WS | /ws/{channel} | No | Real-time data |
+| Method | Path                           | Auth | Purpose                        |
+| ------ | ------------------------------ | ---- | ------------------------------ |
+| POST   | /api/register                  | No   | Create account → api_key + jwt |
+| POST   | /api/login                     | No   | Login → jwt                    |
+| POST   | /api/orders                    | Yes  | Place limit order              |
+| DELETE | /api/orders/{id}               | Yes  | Cancel resting order           |
+| GET    | /api/market/tickers            | No   | All tickers + prices           |
+| GET    | /api/market/{ticker}           | No   | Ticker detail + depth          |
+| GET    | /api/market/{ticker}/orderbook | No   | Aggregated book                |
+| GET    | /api/portfolio                 | Yes  | User holdings + cash           |
+| GET    | /api/leaderboard               | No   | Top 50 by total value          |
+| GET    | /api/health                    | No   | Health check                   |
+| WS     | /ws/{channel}                  | No   | Real-time data                 |
+
+## Workflow — READ BEFORE STARTING ANY TASK
+
+### Observe → Orient → Decide → Act
+
+1. **Observe**: Read the relevant files. Check what imports the code you're about to change. Understand blast radius before touching anything.
+2. **Orient**: Contextualize against existing patterns in this file and `.claude/rules/`. Don't reinvent what's already established.
+3. **Decide**: For tasks touching 3+ files or introducing a new pattern, use Plan Mode and get approval before writing code. Single-file fixes can go straight to implementation.
+4. **Act**: Implement, test, update docs — in that order, as one unit of work.
+
+### Code Quality — Three Questions
+
+Every change must pass these checks:
+
+- **Does it work?** — Tests pass. No regressions. Run the full suite, not just the new test.
+- **Can a fresh reader follow it?** — Favor explicit, readable code over clever abstractions. If a function doesn't fit on screen (~30-40 lines), it probably does too many things — look for a natural split. Never extract a helper that's only called once.
+- **Can it be changed without cascading breakage?** — New logic should be modular. Define the Pydantic model / interface before implementing the route or engine logic behind it.
+
+### Testing Rules
+
+- Write tests alongside code. For tricky logic (matching edge cases, escrow math), write the test first to clarify expected behavior.
+- Every new route gets both a happy-path and an error-case test.
+- Every engine logic change gets a test covering the edge case.
+
+### Error Protocol
+
+- **Two-strike rule**: If a fix attempt fails twice, stop. Re-read the error, identify the false assumption, and either try a fundamentally different approach or ask the user. Do not guess-and-retry in a loop.
+- **Blast radius awareness**: Before editing a shared file (e.g., `engine/exchange.py`, `conftest.py`), check what depends on it. Scale your caution to how much can break.
+
+### Checkpointing
+
+- After completing a discrete feature (one roadmap item, one bug fix), suggest a commit before starting the next. Don't let working code go uncommitted while starting something new.
 
 ## Critical Patterns — READ BEFORE EDITING
 
@@ -58,7 +90,8 @@ pytest
 
 ## Testing
 
-- `pytest` with `asyncio_mode = "auto"` (configured in `pyproject.toml`)
+- **Run tests**: `uv run python -m pytest` — bare `pytest` won't work (not installed globally)
+- `asyncio_mode = "auto"` (configured in `pyproject.toml`)
 - `pythonpath = ["backend"]` — imports resolve from `backend/`
 - 35 tests: 21 engine unit (`test_exchange.py`) + 14 API integration (`test_api.py`)
 - `conftest.py` creates an in-memory SQLite DB + fresh Exchange per test
@@ -76,6 +109,18 @@ pytest
 - Zustand store (`stores/useStore.ts`) — user auth, market prices, order book
 - Auth persisted to localStorage
 - Pages: Dashboard, Ticker detail, Portfolio, Leaderboard, Login, Register
+
+## Self-Updating Docs
+
+When working on this project, keep documentation in sync with reality:
+
+- **If a command fails** — fix the command in this file, `.claude/rules/`, and `memory/MEMORY.md` so it's never tried again.
+- **If you add an endpoint** — add it to the API Endpoints table above and update ROADMAP.md checkboxes.
+- **If you add/change a test** — update test counts in this file's Testing section.
+- **If you discover a new pitfall** — add it to Common Pitfalls in `memory/MEMORY.md`.
+- **If you add a new critical pattern** — add it to the Critical Patterns section above.
+
+Do this as part of the task, not as a separate step.
 
 ## Known Issues (see ROADMAP.md)
 
