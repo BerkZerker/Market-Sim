@@ -45,11 +45,11 @@ UI/UX improvements for the dashboard.
 - [x] **Error feedback** — Surface API errors to the user instead of silently swallowing them
 - [x] **Mobile navigation** — Hamburger menu for small screens
 - [x] **Active route indicator** — Highlight current page in the navbar
-- [ ] **Order history page** — View past orders and trades for the logged-in user
+- [x] **Order history page** — View past orders and trades for the logged-in user
 - [x] **Connection status** — Visual indicator showing WebSocket connection health
-- [ ] **Bid-ask spread display** — Show spread and midpoint on the order book view
-- [ ] **Price charts** — Candlestick charts for each ticker using historical data endpoint
-- [ ] **Dark mode** — Optional dark theme / light theme toggle, switch to a neutral color palette for better accessibility (no blue undertones).
+- [x] **Bid-ask spread display** — Show spread and midpoint on the order book view
+- [x] **Price charts** — Candlestick charts for each ticker using historical data endpoint
+- [x] **Dark mode** — Optional dark theme / light theme toggle, switch to a neutral color palette for better accessibility (no blue undertones).
 
 ## Phase 5 — Infrastructure
 

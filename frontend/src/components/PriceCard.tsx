@@ -16,11 +16,11 @@ export default function PriceCard({
   return (
     <Link
       to={`/ticker/${ticker}`}
-      className="block bg-gray-900 border border-gray-800 rounded-lg p-4 hover:border-gray-600 transition"
+      className="block bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg p-4 hover:border-neutral-400 dark:hover:border-neutral-600 transition"
     >
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-lg font-bold text-white">{ticker}</h3>
-        <span className="text-xl font-mono text-white">
+        <h3 className="text-lg font-bold text-neutral-900 dark:text-white">{ticker}</h3>
+        <span className="text-xl font-mono text-neutral-900 dark:text-white">
           ${price?.toFixed(2) ?? "---"}
         </span>
       </div>

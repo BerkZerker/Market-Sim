@@ -17,12 +17,12 @@ export default function ToastContainer() {
       {notifications.map((n) => (
         <div
           key={n.id}
-          className={`bg-gray-900 border border-gray-700 border-l-4 ${borderColors[n.type]} rounded px-4 py-3 shadow-lg flex items-start gap-3`}
+          className={`bg-neutral-50 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 border-l-4 ${borderColors[n.type]} rounded px-4 py-3 shadow-lg flex items-start gap-3`}
         >
-          <p className="text-sm text-gray-200 flex-1">{n.message}</p>
+          <p className="text-sm text-neutral-800 dark:text-neutral-200 flex-1">{n.message}</p>
           <button
             onClick={() => removeNotification(n.id)}
-            className="text-gray-500 hover:text-gray-300 text-lg leading-none"
+            className="text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 text-lg leading-none"
           >
             &times;
           </button>

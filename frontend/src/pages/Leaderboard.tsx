@@ -42,23 +42,23 @@ export default function Leaderboard() {
           <Spinner size="lg" />
         </div>
       ) : entries.length === 0 ? (
-        <p className="text-gray-500">No players yet. Be the first to register!</p>
+        <p className="text-neutral-400 dark:text-neutral-500">No players yet. Be the first to register!</p>
       ) : (
-        <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+        <div className="bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-800">
-                <th className="text-left p-3 text-gray-400">Rank</th>
-                <th className="text-left p-3 text-gray-400">Player</th>
-                <th className="text-right p-3 text-gray-400">Cash</th>
-                <th className="text-right p-3 text-gray-400">Total Value</th>
+              <tr className="border-b border-neutral-200 dark:border-neutral-800">
+                <th className="text-left p-3 text-neutral-500 dark:text-neutral-400">Rank</th>
+                <th className="text-left p-3 text-neutral-500 dark:text-neutral-400">Player</th>
+                <th className="text-right p-3 text-neutral-500 dark:text-neutral-400">Cash</th>
+                <th className="text-right p-3 text-neutral-500 dark:text-neutral-400">Total Value</th>
               </tr>
             </thead>
             <tbody>
               {entries.map((entry, i) => (
-                <tr key={entry.user_id} className="border-b border-gray-800/50">
-                  <td className="p-3 text-gray-400">#{i + 1}</td>
-                  <td className="p-3 font-semibold text-white">
+                <tr key={entry.user_id} className="border-b border-neutral-200/50 dark:border-neutral-800/50">
+                  <td className="p-3 text-neutral-500 dark:text-neutral-400">#{i + 1}</td>
+                  <td className="p-3 font-semibold text-neutral-900 dark:text-white">
                     {entry.username}
                   </td>
                   <td className="p-3 text-right font-mono">

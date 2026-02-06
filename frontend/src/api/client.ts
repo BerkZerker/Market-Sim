@@ -138,3 +138,50 @@ export async function getLeaderboard() {
     }[];
   }>("/leaderboard");
 }
+
+export async function getOrders(limit = 20, offset = 0) {
+  return request<
+    {
+      order_id: string;
+      ticker: string;
+      side: string;
+      price: number;
+      quantity: number;
+      filled_quantity: number;
+      status: string;
+      created_at: string;
+    }[]
+  >(`/orders?limit=${limit}&offset=${offset}`);
+}
+
+export async function getTrades(ticker?: string, limit = 20, offset = 0) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (ticker) params.set("ticker", ticker);
+  return request<
+    {
+      trade_id: string;
+      ticker: string;
+      price: number;
+      quantity: number;
+      side: string;
+      counterparty_id: string;
+      order_id: string;
+      created_at: string;
+    }[]
+  >(`/trades?${params}`);
+}
+
+export async function getHistory(ticker: string, interval = "5m") {
+  return request<{
+    ticker: string;
+    interval: string;
+    candles: {
+      timestamp: number;
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      volume: number;
+    }[];
+  }>(`/market/${ticker}/history?interval=${interval}`);
+}

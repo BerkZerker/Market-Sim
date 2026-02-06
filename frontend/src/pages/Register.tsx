@@ -43,17 +43,17 @@ export default function Register() {
     return (
       <div className="max-w-md mx-auto">
         <h1 className="text-2xl font-bold mb-6">Registration Successful</h1>
-        <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-4">
-          <p className="text-sm text-gray-400">
+        <div className="bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg p-4 space-y-4">
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
             Save your API key. You'll need it to connect AI agents.
           </p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 bg-gray-800 px-3 py-2 rounded text-sm font-mono text-green-400 break-all">
+            <code className="flex-1 bg-neutral-100 dark:bg-neutral-800 px-3 py-2 rounded text-sm font-mono text-green-400 break-all">
               {apiKey}
             </code>
             <button
               onClick={copyApiKey}
-              className="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-sm transition"
+              className="bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-600 px-3 py-2 rounded text-sm transition"
             >
               {copied ? "Copied!" : "Copy"}
             </button>
@@ -78,7 +78,7 @@ export default function Register() {
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2"
+          className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded px-3 py-2"
           required
           minLength={2}
         />
@@ -87,7 +87,7 @@ export default function Register() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2"
+          className="w-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded px-3 py-2"
           required
           minLength={4}
         />

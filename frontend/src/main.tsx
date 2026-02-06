@@ -6,6 +6,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import Navbar from "./components/Navbar";
 import ToastContainer from "./components/Toast";
 import Dashboard from "./pages/Dashboard";
+import History from "./pages/History";
 import Leaderboard from "./pages/Leaderboard";
 import Login from "./pages/Login";
 import Portfolio from "./pages/Portfolio";
@@ -15,7 +16,7 @@ import Ticker from "./pages/Ticker";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-950 text-gray-100">
+      <div className="min-h-screen bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
         <Navbar />
         <main className="max-w-7xl mx-auto px-4 py-6">
           <ErrorBoundary>
@@ -23,6 +24,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/" element={<Dashboard />} />
               <Route path="/ticker/:symbol" element={<Ticker />} />
               <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/history" element={<History />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
