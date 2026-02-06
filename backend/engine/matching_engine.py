@@ -17,9 +17,9 @@ class MatchingEngine:
         """
 
         trades_made = []
+        ticker = self.order_book.ticker
 
         if side == "buy":
-            # Match against the asks (sell orders), starting with the cheapest
             while (
                 incoming_order.quantity > 0
                 and self.order_book.asks
@@ -30,29 +30,27 @@ class MatchingEngine:
                 trade_quantity = min(incoming_order.quantity, book_order.quantity)
                 trade_price = book_order.price
 
-                # Create a trade record
                 trade = Trade(
+                    ticker=ticker,
                     price=trade_price,
                     quantity=trade_quantity,
                     buyer_id=incoming_order.user_id,
                     seller_id=book_order.user_id,
+                    buy_order_id=incoming_order.order_id,
+                    sell_order_id=book_order.order_id,
                 )
                 trades_made.append(trade)
 
-                # Update quantities
                 incoming_order.quantity -= trade_quantity
                 book_order.quantity -= trade_quantity
 
-                # If the order on the book is completely filled, remove it
                 if book_order.quantity == 0:
                     self.order_book.asks.pop(0)
 
-            # If the incoming order is not completely filled, add it to the book
             if incoming_order.quantity > 0:
                 self.order_book.add_order(incoming_order, "buy")
 
         elif side == "sell":
-            # Match against the bids (buy orders), starting with the most expensive
             while (
                 incoming_order.quantity > 0
                 and self.order_book.bids
@@ -63,24 +61,23 @@ class MatchingEngine:
                 trade_quantity = min(incoming_order.quantity, book_order.quantity)
                 trade_price = book_order.price
 
-                # Create a trade record
                 trade = Trade(
+                    ticker=ticker,
                     price=trade_price,
                     quantity=trade_quantity,
                     buyer_id=book_order.user_id,
                     seller_id=incoming_order.user_id,
+                    buy_order_id=book_order.order_id,
+                    sell_order_id=incoming_order.order_id,
                 )
                 trades_made.append(trade)
 
-                # Update quantities
                 incoming_order.quantity -= trade_quantity
                 book_order.quantity -= trade_quantity
 
-                # If the order on the book is completely filled, remove it
                 if book_order.quantity == 0:
                     self.order_book.bids.pop(0)
 
-            # If the incoming order is not completely filled, add it to the book
             if incoming_order.quantity > 0:
                 self.order_book.add_order(incoming_order, "sell")
 
