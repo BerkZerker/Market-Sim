@@ -12,7 +12,16 @@ uv run uvicorn backend.main:app --reload
 cd frontend && npm run dev
 
 # Tests (pytest is not installed globally — always use uv run)
-uv run python -m pytest
+uv run python -m pytest                          # backend (63 tests)
+cd frontend && npm test                           # frontend (46 tests)
+uv run python -m pytest --cov=backend             # backend with coverage
+
+# Docker
+docker compose up --build                         # full stack
+docker build -t market-sim .                      # image only
+
+# Linting
+uv run pre-commit run --all-files
 ```
 
 ## Architecture
@@ -99,13 +108,18 @@ Every change must pass these checks:
 
 11. **WebSocket auth**: `ws_endpoint` accepts optional `token` and `api_key` query params. `_authenticate_ws()` validates them. All channels remain public; auth is stored per-connection for future user-specific channels.
 
+12. **Environment config**: All settings in `config.py` read from env vars with sensible defaults. `python-dotenv` loads `.env` if present. See `.env.example` for all options.
+
 ## Testing
 
-- **Run tests**: `uv run python -m pytest` — bare `pytest` won't work (not installed globally)
+- **Backend tests**: `uv run python -m pytest` — bare `pytest` won't work (not installed globally)
+- **Frontend tests**: `cd frontend && npm test` — Vitest + React Testing Library
 - `asyncio_mode = "auto"` (configured in `pyproject.toml`)
 - `pythonpath = ["backend"]` — imports resolve from `backend/`
-- 63 tests: 27 engine unit (`test_exchange.py`) + 36 API integration (`test_api.py`)
+- 63 backend tests: 27 engine unit (`test_exchange.py`) + 36 API integration (`test_api.py`)
+- 46 frontend tests: stores, API client, WebSocket, components, pages, hooks, routing
 - `conftest.py` creates an in-memory SQLite DB + fresh Exchange per test
+- Coverage: `uv run python -m pytest --cov=backend --cov-report=term-missing`
 
 ## Code Style
 
@@ -135,4 +149,4 @@ Do this as part of the task, not as a separate step.
 
 ## Known Issues (see ROADMAP.md)
 
-Phases 1, 2, and 3 are complete. See ROADMAP.md for Phase 4+ items.
+Phases 1–5 are complete. See ROADMAP.md for Phase 6 items.

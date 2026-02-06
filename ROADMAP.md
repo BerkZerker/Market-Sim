@@ -55,13 +55,13 @@ UI/UX improvements for the dashboard.
 
 DevOps and deployment readiness.
 
-- [ ] **Environment config** — Load all settings from environment variables with `.env` support
-- [ ] **Dockerfile** — Multi-stage build for backend + frontend in a single container
-- [ ] **docker-compose** — One-command setup for the full stack
-- [ ] **GitHub Actions CI** — Run pytest, ruff, and frontend build on every push
-- [ ] **Pre-commit hooks** — Ruff linting and formatting checks before commits
-- [ ] **Test coverage** — Add pytest-cov and track coverage percentage
-- [ ] **Frontend tests** — Add Vitest for component and integration testing
+- [x] **Environment config** — Load all settings from environment variables with `.env` support
+- [x] **Dockerfile** — Multi-stage build for backend + frontend in a single container
+- [x] **docker-compose** — One-command setup for the full stack
+- [x] **GitHub Actions CI** — Run pytest, ruff, and frontend build on every push
+- [x] **Pre-commit hooks** — Ruff linting and formatting checks before commits
+- [x] **Test coverage** — Add pytest-cov and track coverage percentage
+- [x] **Frontend tests** — Add Vitest for component and integration testing
 
 ## Phase 6 — Advanced Features
 
